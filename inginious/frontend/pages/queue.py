@@ -15,4 +15,4 @@ class QueuePage(INGIniousAuthPage):
 
     def GET_AUTH(self):
         """ GET request """
-        return self.template_helper.get_renderer().queue(*self.submission_manager.get_job_queue_snapshot(), datetime.fromtimestamp)
+        return self.template_helper.get_renderer().queue(self.submission_manager.get_job_queue(), datetime.fromtimestamp)

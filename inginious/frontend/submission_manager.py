@@ -4,6 +4,7 @@
 # more information about the licensing of this file.
 
 """ Manages submissions """
+import asyncio
 import io
 import gettext
 import logging
@@ -11,7 +12,7 @@ import os.path
 import tarfile
 import tempfile
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import bson
 import pymongo
@@ -21,66 +22,135 @@ from pymongo.collection import ReturnDocument
 
 import inginious.common.custom_yaml
 from inginious.frontend.parsable_text import ParsableText
+from inginious.new_agent.agent import reserve_submission
+
+
+class SubmissionManagerAsyncRunner:
+    """
+        Part of the SubmissionManager that runs in the asyncio loop.
+        Detects various states of the submissions. Handles messages.
+    """
+
+    def __init__(self, submission_manager, motor_submission_collection, loop):
+        self._logger = logging.getLogger("inginious.webapp.submissions.runner")
+        self._submission_manager = submission_manager
+        self._loop = loop
+        self._closing = False
+        self._db_sub = motor_submission_collection
+        self._current_submissionid = None
+
+    async def run(self):
+        """ Main method that starts all the subcomponents """
+        self._logger.info("SubmissionManager runner started")
+        asyncio.ensure_future(self._closing_runner())
+        asyncio.ensure_future(self._register())
+        asyncio.ensure_future(self._error_runner())
+
+    async def _closing_runner(self):
+        """ Detects finished submissions """
+        while not self._closing:
+            try:
+                submission = await reserve_submission(self._db_sub, "Frontend", ["done", "error"])
+                self._current_submissionid = submission["_id"]
+                await self._loop.run_in_executor(None, lambda: self._submission_manager._job_done(submission))
+                self._current_submissionid = None
+            except asyncio.CancelledError:
+                self._closing = True
+            except:
+                self._logger.exception("Exception in _closing_runner")
+
+    async def _register(self):
+        """ While a submission is being processed, updates grading_step_last_update"""
+        while not self._closing:
+            # Update grading_step_last_update for the current submission if needed
+            try:
+                if self._current_submissionid is not None:
+                    await self._db_sub.update_one({"_id": self._current_submissionid, "status": "processing"},
+                                                   {"$set": {"grading_step_last_update": datetime.utcnow()}})
+                await asyncio.sleep(10)
+            except asyncio.CancelledError:
+                self._closing = True
+            except:
+                self._logger.exception("Exception in _register")
+
+    async def _error_runner(self):
+        """
+            Finds submission whose assigned agent/frontend has died, redirect them,
+            in error state, to a new frontend
+        """
+        while not self._closing:
+            try:
+                result = await self._db_sub.update_many(
+                    {"status": "processing", "grading_step_last_update": {"$lt": datetime.utcnow()-timedelta(seconds=60)}},
+                    {"$set": {"status": "waiting", "next_grading_step": "error",
+                              "next_grading_step_idx": -1, "text": "Agent did not respond in time",
+                              "result": "error"}}
+                )
+                if result.modified_count != 0:
+                    self._logger.warning("%i submission(s) in failed state were retrieved", result.modified_count)
+                await asyncio.sleep(60)
+            except asyncio.CancelledError:
+                self._closing = True
+            except:
+                self._logger.exception("Exception in _error_runner")
 
 
 class WebAppSubmissionManager:
     """ Manages submissions. Communicates with the database and the client. """
 
-    def __init__(self, client, user_manager, database, gridfs, hook_manager, lti_outcome_manager):
+    def __init__(self, asyncio_loop, motor_submission_collection, course_factory, user_manager, database, gridfs, hook_manager, lti_outcome_manager):
         """
-        :type client: inginious.client.client.AbstractClient
+        :arg asyncio_loop: Asyncio event loop
         :type user_manager: inginious.frontend.user_manager.UserManager
         :type database: pymongo.database.Database
         :type gridfs: gridfs.GridFS
         :type hook_manager: inginious.common.hook_manager.HookManager
         :return:
         """
-        self._client = client
         self._user_manager = user_manager
         self._database = database
         self._gridfs = gridfs
         self._hook_manager = hook_manager
         self._logger = logging.getLogger("inginious.webapp.submissions")
         self._lti_outcome_manager = lti_outcome_manager
+        self._course_factory = course_factory
+        self._async_runner = SubmissionManagerAsyncRunner(self, motor_submission_collection, asyncio_loop)
+        asyncio_loop.call_soon_threadsafe(lambda: asyncio_loop.create_task(self._async_runner.run()))
 
-    def _job_done_callback(self, submissionid, task, result, grade, problems, tests, custom, archive, stdout, stderr, newsub=True):
-        """ Callback called by Client when a job is done. Updates the submission in the database with the data returned after the completion of the
-        job """
-        submission = self.get_submission(submissionid, False)
-        submission = self.get_input_from_submission(submission)
+    def _job_done(self, submission):
+        new_status = "done" if submission["next_grading_step"] == "done" else "error"
 
-        data = {
-            "status": ("done" if result[0] == "success" or result[0] == "failed" else "error"),
-             # error only if error was made by INGInious
-            "result": result[0],
-            "grade": grade,
-            "text": result[1],
-            "tests": tests,
-            "problems": problems,
-            "archive": (self._gridfs.put(archive) if archive is not None else None),
-            "custom": custom,
-            "stdout": stdout,
-            "stderr": stderr
+        set_obj = {
+            "status": new_status
         }
 
         unset_obj = {
             "jobid": "",
             "ssh_host": "",
             "ssh_port": "",
-            "ssh_password": ""
+            "ssh_password": "",
+            "next_grading_step": "",
+            "next_grading_step_idx": ""
         }
 
-        # Save submission to database
         submission = self._database.submissions.find_one_and_update(
-            {"_id": submission["_id"]},
-            {"$set": data, "$unset": unset_obj},
+            {"_id": submission["_id"], "status": "processing"},
+            {"$set": set_obj, "$unset": unset_obj},
             return_document=ReturnDocument.AFTER
         )
 
-        self._hook_manager.call_hook("submission_done", submission=submission, archive=archive, newsub=newsub)
+        if submission is None:
+            self._logger.error("Submission was reserved for processing, but another agent/frontend modified it!")
+            return
 
+        archive = None if submission.get("archive") is None else self._gridfs.get(submission['archive'])
+        self._hook_manager.call_hook("submission_done", submission=submission,
+                                     archive=archive,
+                                     newsub=submission.get("replayed", False))
+
+        task = self._course_factory.get_course(submission["courseid"]).get_task(submission["taskid"])
         for username in submission["username"]:
-            self._user_manager.update_user_stats(username, task, submission, result[0], grade, newsub)
+            self._user_manager.update_user_stats(username, task, submission, submission.get("replayed", False))
 
         if "outcome_service_url" in submission and "outcome_result_id" in submission and "outcome_consumer_key" in submission:
             for username in submission["username"]:
@@ -157,54 +227,50 @@ class WebAppSubmissionManager:
         if not self._user_manager.session_logged_in():
             raise Exception("A user must be logged in to submit an object")
 
-        # Don't enable ssh debug
-        ssh_callback = lambda host, port, password: None
-        if debug == "ssh":
-            ssh_callback = lambda host, port, password: self._handle_ssh_callback(submission["_id"], host, port, password)
-
         # Load input data and add username to dict
         inputdata = bson.BSON.decode(self._gridfs.get(submission["input"]).read())
 
-        if not copy:
-            submissionid = submission["_id"]
-            username = submission["username"][0] # TODO: this may be inconsistent with add_job
-
-            # Remove the submission archive : it will be regenerated
-            if submission.get("archive", None) is not None:
-                self._gridfs.delete(submission["archive"])
-        else:
-            del submission["_id"]
-            username = self._user_manager.session_username()
-            submission["username"] = [username]
-            submission["submitted_on"] = datetime.now()
-            inputdata["@username"] = username
-            inputdata["@lang"] = self._user_manager.session_language()
-            submission["input"] = self._gridfs.put(bson.BSON.encode(inputdata))
-            submission["tests"] = {} # Be sure tags are reinitialized
-            submissionid = self._database.submissions.insert(submission)
-
-        jobid = self._client.new_job(task, inputdata,
-                                     (lambda result, grade, problems, tests, custom, archive, stdout, stderr:
-                                      self._job_done_callback(submissionid, task, result, grade, problems, tests, custom, archive, stdout, stderr, copy)),
-                                     "Frontend - {}".format(submission["username"]), debug, ssh_callback)
-
-        # Clean the submission document in db
-        self._database.submissions.update(
-            {"_id": submission["_id"]},
-            {"$set": {"jobid": jobid, "status": "waiting", "response_type": task.get_response_type()},
-             "$unset": {"result": "", "grade": "", "text": "", "tests": "", "problems": "", "archive": "", "custom": ""}
-             })
-
-        if not copy:
-            self._logger.info("Replaying submission %s - %s - %s - %s", submission["username"], submission["courseid"],
-                              submission["taskid"], submission["_id"])
-        else:
-            self._logger.info("Copying submission %s - %s - %s - %s as %s", submission["username"], submission["courseid"],
+        if copy:
+            self.add_job(task, inputdata, debug)
+            self._logger.info("Copying submission %s - %s - %s - %s as %s", submission["username"],
+                              submission["courseid"],
                               submission["taskid"], submission["_id"], self._user_manager.session_username())
+            return
+
+        # Remove the submission archive : it will be regenerated
+        if submission.get("archive", None) is not None:
+            self._gridfs.delete(submission["archive"])
+
+        to_update = {
+            "status": "waiting",
+            "debug": debug,
+            "response_type": task.get_response_type(),
+            "next_grading_step": task.get_environment(),
+            "next_grading_step_idx": 0,
+            "grading_steps": [task.get_environment()],
+            "grading_step_done_by": [],
+            "grading_step_last_update": datetime.now()
+        }
+
+        to_unset = {
+            "result": "",
+            "grade": "",
+            "text": "",
+            "tests": "",
+            "problems": "",
+            "archive": "",
+            "custom": ""
+        }
+
+        self._database.submissions.update({"_id": submission["_id"]}, {"$set": to_update, "$unset": to_unset})
+
+        self._logger.info("Replaying submission %s - %s - %s - %s", submission["username"], submission["courseid"],
+                          submission["taskid"], submission["_id"])
 
     def get_available_environments(self):
         """:return a list of available environments """
-        return self._client.get_available_containers()
+        # TODO: cache if needed
+        return list(self._database.agent_status.distinct("envs"))
 
     def get_submission(self, submissionid, user_check=True):
         """ Get a submission from the database """
@@ -234,7 +300,7 @@ class WebAppSubmissionManager:
             "courseid": task.get_course_id(),
             "taskid": task.get_id(),
             "username": username,
-            "status": "waiting"})
+            "status": {"$in": ["waiting", "processing"]}})
 
         if waiting_submission is not None:
             raise Exception("A submission is already pending for this task!")
@@ -245,7 +311,13 @@ class WebAppSubmissionManager:
             "status": "waiting",
             "submitted_on": datetime.now(),
             "username": [username],
-            "response_type": task.get_response_type()
+            "response_type": task.get_response_type(),
+            "grading_steps": [task.get_environment()],
+            "next_grading_step": task.get_environment(),
+            "next_grading_step_idx": 0,
+            "grading_step_done_by": [],
+            "grading_step_last_update": datetime.now(),
+            "debug": debug
         }
 
         # Send additional data to the client in inputdata. For now, the username and the language. New fields can be added with the
@@ -262,20 +334,6 @@ class WebAppSubmissionManager:
         self._before_submission_insertion(task, inputdata, debug, obj)
         submissionid = self._database.submissions.insert(obj)
         to_remove = self._after_submission_insertion(task, inputdata, debug, obj, submissionid)
-
-        ssh_callback = lambda host, port, password: None
-        if debug == "ssh":
-            ssh_callback = lambda host, port, password: self._handle_ssh_callback(submissionid, host, port, password)
-
-        jobid = self._client.new_job(task, inputdata,
-                                     (lambda result, grade, problems, tests, custom, archive, stdout, stderr:
-                                      self._job_done_callback(submissionid, task, result, grade, problems, tests, custom, archive, stdout, stderr, True)),
-                                     "Frontend - {}".format(username), debug, ssh_callback)
-
-        self._database.submissions.update(
-            {"_id": submissionid, "status": "waiting"},
-            {"$set": {"jobid": jobid}}
-        )
 
         self._logger.info("New submission from %s - %s - %s/%s - %s", self._user_manager.session_username(),
                           self._user_manager.session_email(), task.get_course_id(), task.get_id(),
@@ -401,7 +459,7 @@ class WebAppSubmissionManager:
         if "jobid" not in submission:
             return False
 
-        return self._client.kill_job(submission["jobid"])
+        # TODO
 
     def user_is_submission_owner(self, submission):
         """ Returns true if the current user is the owner of this jobid, false else """
@@ -578,40 +636,28 @@ class WebAppSubmissionManager:
             }
             self._database.submissions.update_one({"_id": submission_id}, {"$set": obj})
 
-    def get_job_queue_snapshot(self):
-        """ Get a snapshot of the remote backend job queue. May be a cached version.
-            May not contain recent jobs. May return None if no snapshot is available
+    def get_job_queue(self):
+        """ Get information about the waiting/being processed jobs
 
-        Return a tuple of two lists (None, None):
-        jobs_running: a list of tuples in the form
-            (job_id, is_current_client_job, info, launcher, started_at, max_end)
-            where
-            - job_id is a job id. It may be from another client.
-            - is_current_client_job is a boolean indicating if the client that asked the request has started the job
-            - agent_name is the agent name
-            - info is "courseid/taskid"
-            - launcher is the name of the launcher, which may be anything
-            - started_at the time (in seconds since UNIX epoch) at which the job started
-            - max_end the time at which the job will timeout (in seconds since UNIX epoch), or -1 if no timeout is set
-        jobs_waiting: a list of tuples in the form
-            (job_id, is_current_client_job, info, launcher, max_time)
-            where
-            - job_id is a job id. It may be from another client.
-            - is_current_client_job is a boolean indicating if the client that asked the request has started the job
-            - info is "courseid/taskid"
-            - launcher is the name of the launcher, which may be anything
-            - max_time the maximum time that can be used, or -1 if no timeout is set
+        :returns: A list of dict in the form {
+            "_id": ObjectId,
+            "status": "waiting" | "processing",
+            "courseid": str,
+            "taskid": str,
+            "grading_step_done_by": list[str],
+            "grading_steps": list[str],
+            "grading_step_last_update": datetime.datetime,
+            "next_grading_step_idx": int,
+            "next_grading_step": str,
+            "username": list[str],
+            "submitted_on": datetime.datetime
+        }, sorted by increasing "submitted_on".
         """
-        return self._client.get_job_queue_snapshot()
-
-    def get_job_queue_info(self, jobid):
-        """
-        :param jobid: the JOB id (not the submission id!). You should retrieve it before calling this function by calling get_submission(...)[
-        "job_id"].
-        :return: If the submission is in the queue, then returns a tuple (nb tasks before running (or -1 if running), approx wait time in seconds)
-                 Else, returns None
-        """
-        return self._client.get_job_queue_info(jobid)
+        return list(self._database.submissions.find({"status": {"$in": ["waiting", "processing"]}},
+                                                    ["_id", "status", "courseid", "taskid", "grading_step_done_by",
+                                                     "grading_steps", "grading_step_last_update", "next_grading_step",
+                                                     "next_grading_step_idx", "username", "submitted_on"],
+                                                    sort=[("submitted_on", 1)]))
 
 
 def update_pending_jobs(database):

@@ -1,4 +1,4 @@
-$def with (jobs_running, jobs_waiting, from_timestamp)
+$def with (jobs, from_timestamp)
 
 $#
 $# This file is part of INGInious. See the LICENSE and the COPYRIGHTS files for
@@ -17,62 +17,63 @@ $def NavbarF():
 $var Navbar: $:NavbarF()
 
 <h2>$:_("Job queue")</h2>
-$:_("This page shows a <strong>snapshot</strong> of the job queue.")
 
-<h3>$:_("Running jobs")</h3>
-$if jobs_running is not None and len(jobs_running) > 0:
+$if jobs is not None and len(jobs) > 0:
     <table class="table table-striped">
         <tr>
-            <th>$:_("Type")</th>
-            <th>$:_("Local client")</th>
-            <th>$:_("Agent name")</th>
-            <th>$:_("Name")</th>
-            <th>$:_("Launcher name")</th>
+            <th>$:_("Id")</th>
             <th>$:_("Started at")</th>
-            <th>$:_("Timeout at")</th>
+            <th>$:_("Status")</th>
+            <th>$:_("Course/Task")</th>
+            <th>$:_("Users")</th>
+            <th>$:_("Grading steps")</th>
+            <th>$:_("Last update")</th>
         </tr>
-        $for (job_id, is_current_client_job, agent_name, info, launcher, started_at, max_end) in jobs_running:
+        $for job in jobs:
             <tr>
-                <td data-toggle="tooltip" data-placement="right" title="$job_id">Task</td>
+                <td>$job["_id"]</td>
+                <td>$job["submitted_on"].strftime("%d/%m/%Y %H:%M:%S")</td>
                 <td>
-                    $if is_current_client_job:
-                        $:_("Yes")
+                    $if job["status"] == "waiting":
+                        $:_("Waiting")
+                    $elif job["status"] == "processing":
+                        $:_("Processing")
                     $else:
-                        $:_("No")
+                        $:_("Unknown")
                 </td>
-                <td>$agent_name</td>
-                <td>$info</td>
-                <td>$launcher</td>
-                <td>$from_timestamp(started_at).strftime("%d/%m/%Y %H:%M:%S")</td>
-                <td>$from_timestamp(max_end).strftime("%d/%m/%Y %H:%M:%S")</td>
+                <td>$job["courseid"]/$job["taskid"]</td>
+                <td>$",".join(job["username"])</td>
+                <td>
+                    <ul class="fa-ul">
+                        $for idx, step in enumerate(job["grading_steps"]):
+                            <li>
+                                $if idx < len(job["grading_step_done_by"]) - 1:
+                                    <span class="fa-li"><i class="fa fa-check"></i></span>
+                                $elif idx == job["next_grading_step_idx"]:
+                                    $if job["status"] == "processing":
+                                        <span class="fa-li"><i class="fa fa-spinner fa-pulse"></i></span>
+                                    $else:
+                                        <span class="fa-li"><i class="fa fa-spinner"></i></span>
+                                $else:
+                                    <span class="fa-li"><i class="fa fa-ellipsis-h"></i></span>
+                                $step
+                                $if idx < len(job["grading_step_done_by"]):
+                                    ($job["grading_step_done_by"][idx])
+                            </li>
+                        <li>
+                            $if job["next_grading_step_idx"] == -1:
+                                $if job["status"] == "processing":
+                                    <span class="fa-li"><i class="fa fa-spinner fa-pulse"></i></span>
+                                $else:
+                                    <span class="fa-li"><i class="fa fa-spinner"></i></span>
+                            $else:
+                                <span class="fa-li"><i class="fa fa-ellipsis-h"></i></span>
+                            $:_("Finalizing")
+                        </li>
+                    </ul>
+                </td>
+                <td>$job["grading_step_last_update"].strftime("%d/%m/%Y %H:%M:%S")</td>
             </tr>
     </table>
 $else:
-    $:_("There are no jobs running")
-
-<h3>$:_("Jobs in queue")</h3>
-$if jobs_waiting is not None and len(jobs_waiting) > 0:
-    <table class="table table-striped">
-        <tr>
-            <th>$:_("Type")</th>
-            <th>$:_("Local")</th>
-            <th>$:_("Name")</th>
-            <th>$:_("Launcher name")</th>
-            <th>$:_("Maximum runtime in seconds")</th>
-        </tr>
-        $for (job_id, is_current_client_job, info, launcher, max_end) in jobs_waiting:
-        <tr>
-            <td data-toggle="tooltip" data-placement="right" title="$job_id">Task</td>
-            <td>
-                $if is_current_client_job:
-                    $:_("Yes")
-                $else:
-                    $:_("No")
-            </td>
-            <td>$info</td>
-            <td>$launcher</td>
-            <td>$max_end</td>
-        </tr>
-    </table>
-$else:
-    $:_("There are no jobs waiting in queue")
+    $:_("There are no ungraded submissions")

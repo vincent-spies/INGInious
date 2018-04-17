@@ -389,14 +389,13 @@ function waitForSubmission(submissionid)
         jQuery.post(url, {"@action": "check", "submissionid": submissionid}, null, "json")
             .done(function(data)
             {
-                if("status" in data && data['status'] == "waiting")
+                if("status" in data && (data['status'] == "waiting" || data['status'] == "processing"))
                 {
                     waitForSubmission(submissionid);
                     if("ssh_host" in data && "ssh_port" in data && "ssh_password" in data)
                         displayRemoteDebug(submissionid, data);
                     else
                         displayTaskLoadingAlert(data, submissionid);
-
                 }
                 else if("status" in data && "result" in data && "grade" in data)
                 {

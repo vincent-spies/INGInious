@@ -13,7 +13,7 @@ from inginious.frontend.fix_webpy_cookies import fix_webpy_cookies
 fix_webpy_cookies() # TODO: remove me once https://github.com/webpy/webpy/pull/419 is merge in web.py
 
 from gridfs import GridFS
-from inginious.frontend.arch_helper import create_arch, start_asyncio_and_zmq
+from inginious.frontend.arch_helper import create_arch, start_asyncio
 from inginious.frontend.cookieless_app import CookieLessCompatibleApplication
 from inginious.frontend.courses import WebAppCourse
 from inginious.frontend.database_updater import update_database
@@ -25,6 +25,7 @@ from inginious.frontend.tasks import WebAppTask
 from inginious.frontend.template_helper import TemplateHelper
 from inginious.frontend.user_manager import UserManager
 from pymongo import MongoClient
+import motor.motor_asyncio as motor
 from web.debugerror import debugerror
 
 import inginious.frontend.pages.preferences.utils as preferences_utils
@@ -106,10 +107,9 @@ def _put_configuration_defaults(config):
     return config
 
 
-def _close_app(app, mongo_client, client):
+def _close_app(app, mongo_client):
     """ Ensures that the app is properly closed """
     app.stop()
-    client.close()
     mongo_client.close()
 
 
@@ -120,9 +120,15 @@ def get_app(config):
     """
     config = _put_configuration_defaults(config)
 
-    mongo_client = MongoClient(host=config.get('mongo_opt', {}).get('host', 'localhost'))
-    database = mongo_client[config.get('mongo_opt', {}).get('database', 'INGInious')]
+    db_host = config.get('mongo_opt', {}).get('host', 'localhost')
+    db_name = config.get('mongo_opt', {}).get('database', 'INGInious')
+    mongo_client = MongoClient(host=db_host)
+    database = mongo_client[db_name]
     gridfs = GridFS(database)
+
+    # another link to the database to be used in asyncio
+    motor_mongo_client = motor.AsyncIOMotorClient(db_host)
+    motor_database = motor_mongo_client[db_name]
 
     appli = CookieLessCompatibleApplication(MongoStore(database, 'sessions'))
 
@@ -152,7 +158,7 @@ def get_app(config):
     default_allowed_file_extensions = config['allowed_file_extensions']
     default_max_file_size = config['max_file_size']
 
-    zmq_context, __ = start_asyncio_and_zmq(config.get('debug_asyncio', False))
+    asyncio_loop, asyncio_thread = start_asyncio(config.get('debug_asyncio', False))
 
     # Init the different parts of the app
     plugin_manager = PluginManager()
@@ -178,11 +184,11 @@ def get_app(config):
 
     update_pending_jobs(database)
 
-    client = create_arch(config, fs_provider, zmq_context)
+    asyncio_tasks = create_arch(config, motor_database, fs_provider, asyncio_loop)
 
     lti_outcome_manager = LTIOutcomeManager(database, user_manager, course_factory)
 
-    submission_manager = WebAppSubmissionManager(client, user_manager, database, gridfs, plugin_manager, lti_outcome_manager)
+    submission_manager = WebAppSubmissionManager(asyncio_loop, motor_database["submissions"], course_factory, user_manager, database, gridfs, plugin_manager, lti_outcome_manager)
 
     template_helper = TemplateHelper(plugin_manager, user_manager, 'frontend/templates',
                                      'frontend/templates/layout',
@@ -199,7 +205,7 @@ def get_app(config):
         web.config.smtp_starttls = bool(smtp_conf.get("starttls", False))
         web.config.smtp_username = smtp_conf.get("username", "")
         web.config.smtp_password = smtp_conf.get("password", "")
-        web.config.smtp_sendername = smtp_conf.get("sendername", "no-reply@ingnious.org")
+        web.config.smtp_sendername = smtp_conf.get("sendername", "no-reply@inginious.org")
 
     # Update the database
     update_database(database, gridfs, course_factory, user_manager)
@@ -251,9 +257,6 @@ def get_app(config):
     appli.init_mapping(urls)
 
     # Loads plugins
-    plugin_manager.load(client, appli, course_factory, task_factory, database, user_manager, submission_manager, config.get("plugins", []))
+    plugin_manager.load(appli, course_factory, task_factory, database, user_manager, submission_manager, config.get("plugins", []))
 
-    # Start the inginious.backend
-    client.start()
-
-    return appli.wsgifunc(), lambda: _close_app(appli, mongo_client, client)
+    return appli.wsgifunc(), lambda: _close_app(appli, mongo_client)

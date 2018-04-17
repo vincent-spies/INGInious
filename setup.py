@@ -16,7 +16,8 @@ on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
 install_requires = [
     "docker>=2.5.0",
     "docutils>=0.14",
-    "pymongo>=3.2.2",
+    "pymongo>=3.6.1",
+    "motor>=1.2.1",
     "PyYAML>=3.11",
     "web.py>=0.40.dev0",
     "lti>=0.9.0",
@@ -24,7 +25,6 @@ install_requires = [
     "httplib2>=0.9",
     "watchdog >= 0.8.3",
     "msgpack-python >= 0.4.7",
-    "pyzmq >= 15.3.0",
     "natsort >= 5.0.1",
     "psutil >= 4.4.2",
     "zipstream >= 1.1.4"

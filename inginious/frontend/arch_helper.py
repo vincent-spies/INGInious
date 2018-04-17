@@ -8,33 +8,48 @@ import asyncio
 import multiprocessing
 import threading
 
-from zmq.asyncio import ZMQEventLoop, Context
-
+import motor.motor_asyncio as motor
 from inginious.agent.docker_agent import DockerAgent
 from inginious.agent.mcq_agent import MCQAgent
-from inginious.backend.backend import Backend
-from inginious.client.client import Client
 
-def start_asyncio_and_zmq(debug_asyncio=False):
-    """ Init asyncio and ZMQ. Starts a daemon thread in which the asyncio loops run.
-    :return: a ZMQ context and a Thread object (as a tuple)
+from inginious.new_agent import GradingUnit, Agent
+
+class GUDemo(GradingUnit):
+    def __init__(self, submission, send_message, agent, name):
+        super().__init__(submission, send_message, agent)
+        self.name = name
+
+    async def init(self):
+        pass
+
+    async def kill(self):
+        pass
+
+    async def message(self, message):
+        print("Message", message)
+
+    async def grade(self):
+        await asyncio.sleep(600)
+        return {"result": "success", "text": self.submission.get("text", "") + "Processed by {}\n".format(self.name)}
+create_gudemo = lambda name: (lambda a,b,c: GUDemo(a,b,c,name))
+
+def start_asyncio(debug_asyncio=False):
+    """ Init asyncio. Starts a daemon thread in which the asyncio loops run.
+    :return: a tuple (asyncio loop object, Thread)
     """
-    loop = ZMQEventLoop()
-    asyncio.set_event_loop(loop)
+    loop = asyncio.get_event_loop()
     if debug_asyncio:
         loop.set_debug(True)
-    zmq_context = Context()
 
-    t = threading.Thread(target=_run_asyncio, args=(loop, zmq_context), daemon=True)
+    t = threading.Thread(target=_run_asyncio, args=(loop,), daemon=True)
     t.start()
 
-    return zmq_context, t
+    return loop, t
 
-def _run_asyncio(loop, zmq_context):
+def _run_asyncio(loop):
     """
-    Run asyncio (should be called in a thread) and close the loop and the zmq context when the thread ends
+    Run asyncio (should be called in a thread) and close the loop when the thread ends
     :param loop:
-    :param zmq_context:
     :return:
     """
     try:
@@ -44,23 +59,23 @@ def _run_asyncio(loop, zmq_context):
         pass
     finally:
         loop.close()
-        zmq_context.destroy(1000)
 
-def create_arch(configuration, tasks_fs, context):
+def create_arch(configuration, database, tasks_fs, loop):
     """ Helper that can start a simple complete INGInious arch locally if needed, or a client to a remote backend.
         Intended to be used on command line, makes uses of exit() and the logger inginious.frontend.
     :param configuration: configuration dict
+    :param database: AsyncIOMotorDatabase object
     :param tasks_fs: FileSystemProvider to the courses/tasks folders
-    :param context: a ZMQ context
-    :param is_testing: boolean
-    :return: a Client object
+    :param loop: an asyncio loop
+    :return: a list of asyncio Tasks
     """
-
     logger = logging.getLogger("inginious.frontend")
 
-    backend_link = configuration.get("backend", "local")
-    if backend_link == "local":
-        logger.info("Starting a simple arch (backend, docker-agent and mcq-agent) locally")
+    tasks = []
+
+    start_local_agents = configuration.get("start_local_agents", True)
+    if start_local_agents:
+        logger.info("Starting a simple arch (docker-agent and mcq-agent) locally")
 
         local_config = configuration.get("local-config", {})
         concurrency = local_config.get("concurrency", multiprocessing.cpu_count())
@@ -78,28 +93,23 @@ def create_arch(configuration, tasks_fs, context):
         else:
             debug_ports = range(64100, 64111)
 
-        client = Client(context, "inproc://backend_client")
-        backend = Backend(context, "inproc://backend_agent", "inproc://backend_client")
-        agent_docker = DockerAgent(context, "inproc://backend_agent", "Docker - Local agent", concurrency, tasks_fs, debug_host, debug_ports, tmp_dir)
-        agent_mcq = MCQAgent(context, "inproc://backend_agent", "MCQ - Local agent", 1, tasks_fs)
+        agent1 = Agent(database, "test1", None, {"a": create_gudemo("test1-a"), "b": create_gudemo("test1-b")})
+        agent2 = Agent(database, "test2", None, {"c": create_gudemo("test2-c"), "b": create_gudemo("test2-b")})
 
-        asyncio.ensure_future(agent_docker.run())
-        asyncio.ensure_future(agent_mcq.run())
-        asyncio.ensure_future(backend.run())
-    elif backend_link in ["remote", "remote_manuel", "docker_machine"]: #old-style config
-        logger.error("Value '%s' for the 'backend' option is configuration.yaml is not supported anymore. \n"
-                     "Have a look at the 'update' section of the INGInious documentation in order to upgrade your configuration.yaml", backend_link)
-        exit(1)
-        return None #... pycharm returns a warning else :-(
-    else:
-        logger.info("Creating a client to backend at %s", backend_link)
-        client = Client(context, backend_link)
+        loop.call_soon_threadsafe(lambda: loop.create_task(agent1.run()))
+        loop.call_soon_threadsafe(lambda: loop.create_task(agent2.run()))
+
+        #agent_docker = DockerAgent("Docker - Local agent", concurrency, tasks_fs, debug_host, debug_ports, tmp_dir)
+        #agent_mcq = MCQAgent("MCQ - Local agent", 1, tasks_fs)
+
+        #tasks.append(asyncio.ensure_future(agent_docker.run()))
+        #tasks.append(asyncio.ensure_future(agent_mcq.run()))
 
     # check for old-style configuration entries
-    old_style_configs = ["agents", 'containers', "machines", "docker_daemons"]
+    old_style_configs = ["backend", "agents", 'containers', "machines", "docker_daemons"]
     for c in old_style_configs:
         if c in configuration:
             logger.warning("Option %s in configuration.yaml is not used anymore.\n"
                            "Have a look at the 'update' section of the INGInious documentation in order to upgrade your configuration.yaml", c)
 
-    return client
+    return tasks

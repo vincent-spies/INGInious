@@ -280,88 +280,90 @@ class BaseTaskPage(object):
             else:
                 raise web.notfound()
 
-    def submission_to_json(self, task, data, debug, reloading=False, replace=False, tags={}):
+    def submission_to_json(self, task, submission, debug, reloading=False, replace=False, tags=None):
         """ Converts a submission to json (keeps only needed fields) """
 
-        if "ssh_host" in data:
+        if tags is None:
+            tags = {}
+
+        if "ssh_host" in submission:
             return json.dumps({'status': "waiting", 'text': "<b>SSH server active</b>",
-                               'ssh_host': data["ssh_host"], 'ssh_port': data["ssh_port"],
-                               'ssh_password': data["ssh_password"]})
+                               'ssh_host': submission["ssh_host"], 'ssh_port': submission["ssh_port"],
+                               'ssh_password': submission["ssh_password"]})
 
         # Here we are waiting. Let's send some useful information.
-        waiting_data = self.submission_manager.get_job_queue_info(data["jobid"]) if "jobid" in data else None
-        if waiting_data is not None and not reloading:
-            nb_tasks_before, approx_wait_time = waiting_data
-            wait_time = round(approx_wait_time)
-            if nb_tasks_before == -1 and wait_time <= 0:
-                text = _("<b>INGInious is currently grading your answers.<b/> (almost done)")
-            elif nb_tasks_before == -1:
-                text = _("<b>INGInious is currently grading your answers.<b/> (Approx. wait time: {} seconds)").format(
-                    wait_time)
-            elif nb_tasks_before == 0:
-                text = _("<b>You are next in the waiting queue!</b>")
-            elif nb_tasks_before == 1:
-                text = _("<b>There is one task in front of you in the waiting queue.</b>")
+        if submission["status"] in ["waiting", "processing"] and not reloading:
+            if submission["next_grading_step_idx"] == -1:
+                text = _("<b>Finalizing...</b>")
+            elif submission["next_grading_step_idx"] == 0 and submission["status"] == "waiting":
+                nb_tasks_before = 10
+                if nb_tasks_before == 0:
+                    text = _("<b>You are next in the waiting queue!</b>")
+                elif nb_tasks_before == 1:
+                    text = _("<b>There is one task in front of you in the waiting queue.</b>")
+                else:
+                    text = _("<b>There are {} tasks in front of you in the waiting queue.</b>").format(nb_tasks_before)
             else:
-                text = _("<b>There are {} tasks in front of you in the waiting queue.</b>").format(nb_tasks_before)
+                text = _("<b>INGInious is currently grading your answers.<b/> ({}/{} steps done)").format(
+                    submission["next_grading_step_idx"], len(submission["grading_steps"]))
 
             return json.dumps({'status': "waiting", 'text': text})
 
         tojson = {
-            'status': data['status'],
-            'result': data.get('result', 'crash'),
-            'id': str(data["_id"]),
-            'submitted_on': str(data['submitted_on']),
-            'grade': str(data.get("grade", 0.0)),
+            'status': submission['status'],
+            'result': submission.get('result', 'crash'),
+            'id': str(submission["_id"]),
+            'submitted_on': str(submission['submitted_on']),
+            'grade': str(submission.get("grade", 0.0)),
             'replace': replace and not reloading  # Replace the evaluated submission
         }
 
-        if "text" in data:
-            tojson["text"] = data["text"]
-        if "problems" in data:
-            tojson["problems"] = data["problems"]
+        if "text" in submission:
+            tojson["text"] = submission["text"]
+        if "problems" in submission:
+            tojson["problems"] = submission["problems"]
 
         if debug:
-            tojson["debug"] = data
+            tojson["debug"] = submission
 
-        if tojson['status'] == 'waiting':
+        if tojson['status'] in ['waiting', 'processing']:
             tojson["text"] = _("<b>Your submission has been sent...</b>")
         elif tojson["result"] == "failed":
-            tojson["text"] = _("There are some errors in your answer. Your score is {score}%.").format(score=data["grade"])
+            tojson["text"] = _("There are some errors in your answer. Your score is {score}%.").format(score=submission["grade"])
         elif tojson["result"] == "success":
-            tojson["text"] = _("Your answer passed the tests! Your score is {score}%.").format(score=data["grade"])
+            tojson["text"] = _("Your answer passed the tests! Your score is {score}%.").format(score=submission["grade"])
         elif tojson["result"] == "timeout":
-            tojson["text"] = _("Your submission timed out. Your score is {score}%.").format(score=data["grade"])
+            tojson["text"] = _("Your submission timed out. Your score is {score}%.").format(score=submission["grade"])
         elif tojson["result"] == "overflow":
-            tojson["text"] = _("Your submission made an overflow. Your score is {score}%.").format(score=data["grade"])
+            tojson["text"] = _("Your submission made an overflow. Your score is {score}%.").format(score=submission["grade"])
         elif tojson["result"] == "killed":
             tojson["text"] = _("Your submission was killed.")
         else:
             tojson["text"] = _("An internal error occurred. Please retry later. "
                                "If the error persists, send an email to the course administrator.")
 
-        tojson["text"] = "<b>" + tojson["text"] + " " + _("[Submission #{submissionid}]").format(submissionid=data["_id"]) + "</b>" + data.get("text", "")
-        tojson["text"] = self.plugin_manager.call_hook_recursive("feedback_text", task=task, submission=data, text=tojson["text"])["text"]
+        tojson["text"] = "<b>" + tojson["text"] + " " + _("[Submission #{submissionid}]").format(submissionid=submission["_id"]) + "</b>" + submission.get("text", "")
+        tojson["text"] = self.plugin_manager.call_hook_recursive("feedback_text", task=task, submission=submission, text=tojson["text"])["text"]
 
         if reloading:
             # Set status='ok' because we are reloading an old submission.
             tojson["status"] = 'ok'
             # And also include input
-            tojson["input"] = data.get('input', {})
+            tojson["input"] = submission.get('input', {})
 
-        if "tests" in data:
+        if "tests" in submission:
             tojson["tests"] = {}
             if tags:
                 for tag in tags[0]+tags[1]: # Tags only visible for admins should not appear in the json for students.
-                    if (tag.is_visible_for_student() or debug) and tag.get_id() in data["tests"]:
-                        tojson["tests"][tag.get_id()] = data["tests"][tag.get_id()]
+                    if (tag.is_visible_for_student() or debug) and tag.get_id() in submission["tests"]:
+                        tojson["tests"][tag.get_id()] = submission["tests"][tag.get_id()]
             if debug: #We add also auto tags when we are admin
-                for tag in data["tests"]:
+                for tag in submission["tests"]:
                     if tag.startswith("*auto-tag-"):
-                        tojson["tests"][tag] = data["tests"][tag]
+                        tojson["tests"][tag] = submission["tests"][tag]
 
         # allow plugins to insert javascript to be run in the browser after the submission is loaded
-        tojson["feedback_script"] = "".join(self.plugin_manager.call_hook("feedback_script", task=task, submission=data))
+        tojson["feedback_script"] = "".join(self.plugin_manager.call_hook("feedback_script", task=task, submission=submission))
 
         return json.dumps(tojson, default=str)
 
