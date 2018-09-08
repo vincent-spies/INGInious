@@ -1,9 +1,6 @@
 # coding=utf-8
 import asyncio
 
-class InitPrefetch:
-    """ Iterator that prefetch the first value of another iterator. init() must be called to start the prefetching. """
-
 class AsyncTimeoutItr:
     """ Iterator that returns None after 5 seconds at each iteration, if the other iterator has not yet provided
         a result.
