@@ -257,7 +257,7 @@ class BaseTaskPage(object):
                         # This should never happen, as user_manager.update_user_stats is called whenever a submission is done.
                         return json.dumps({'status': "error", "text": _("Internal error")})
 
-                    return self.submission_to_json(task, result, is_admin, False, default_submissionid == result['_id'], tags=task.get_tags())
+                    return self.submission_to_json(task, result, is_admin, False, default_submissionid == result['_id'], tags=course.get_tags(self.user_manager.session_language(), [0, 1]))
                 else:
                     web.header('Content-Type', 'application/json')
                     return self.submission_to_json(task, result, is_admin)
@@ -270,7 +270,7 @@ class BaseTaskPage(object):
                     raise web.notfound()
                 web.header('Content-Type', 'application/json')
                 
-                return self.submission_to_json(task, submission, is_admin, True, tags=task.get_tags())
+                return self.submission_to_json(task, submission, is_admin, True, tags=course.get_tags(self.user_manager.session_language(), [0, 1]))
                 
             elif "@action" in userinput and userinput["@action"] == "kill" and "submissionid" in userinput:
                 self.submission_manager.kill_running_submission(userinput["submissionid"])  # ignore return value
@@ -293,7 +293,7 @@ class BaseTaskPage(object):
             else:
                 raise web.notfound()
 
-    def submission_to_json(self, task, data, debug, reloading=False, replace=False, tags={}):
+    def submission_to_json(self, task, data, debug, reloading=False, replace=False, tags=[]):
         """ Converts a submission to json (keeps only needed fields) """
 
         if "ssh_host" in data:
@@ -364,8 +364,9 @@ class BaseTaskPage(object):
 
         if "tests" in data:
             tojson["tests"] = {}
-            if tags:
-                for tag in tags[0]+tags[1]: # Tags only visible for admins should not appear in the json for students.
+            categories = task.get_categories()
+            if categories:
+                for tag in [tag for tag in tags if tag.get_id() in categories]: # Tags only visible for admins should not appear in the json for students.
                     if (tag.is_visible_for_student() or debug) and tag.get_id() in data["tests"]:
                         tojson["tests"][tag.get_id()] = data["tests"][tag.get_id()]
             if debug: #We add also auto tags when we are admin
