@@ -188,7 +188,7 @@ def get_app(config):
                                                                    DisplayableMatchProblem]
     }
 
-    course_factory, task_factory = create_factories(fs_provider, default_problem_types, plugin_manager, WebAppCourse, WebAppTask)
+    course_factory, task_factory = create_factories(fs_provider, default_problem_types, plugin_manager, WebAppCourse, WebAppTask, database)
 
     user_manager = UserManager(appli.get_session(), database, config.get('superadmins', []))
 

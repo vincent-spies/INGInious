@@ -17,12 +17,13 @@ from inginious.common.exceptions import InvalidNameException, CourseNotFoundExce
 class CourseFactory(object):
     """ Load courses from disk """
 
-    def __init__(self, filesystem: FileSystemProvider, task_factory, hook_manager, course_class=Course):
+    def __init__(self, filesystem: FileSystemProvider, task_factory, hook_manager, course_class=Course, db=None):
         self._filesystem = filesystem
         self._task_factory = task_factory
         self._hook_manager = hook_manager
         self._course_class = course_class
-        self._cache = {}
+        #self._cache = {}
+        self._db = db
 
     def get_course(self, courseid):
         """
@@ -35,7 +36,9 @@ class CourseFactory(object):
         if self._cache_update_needed(courseid):
             self._update_cache(courseid)
 
-        return self._cache[courseid][0]
+        #return self._cache[courseid][0]
+        return self._course_class(courseid, self._db.courses.find_one({"courseid":courseid})["course_descriptor"], self.get_course_fs(courseid), self._task_factory,
+                           self._hook_manager)
 
     def get_task(self, courseid, taskid):
         """
@@ -153,7 +156,9 @@ class CourseFactory(object):
         :raise InvalidNameException, CourseNotFoundException
         :return: True if an update of the cache is needed, False else
         """
-        if courseid not in self._cache:
+        #if courseid not in self._cache:
+        #    return True
+        if self._db.courses.find_one({"courseid":courseid}) is None:
             return True
 
         try:
@@ -168,10 +173,14 @@ class CourseFactory(object):
         except:
             raise CourseNotFoundException()
 
-        last_modif = self._cache[courseid][1]
+        #last_modif = self._cache[courseid][1]
+        last_modif = self._db.courses.find_one({"courseid":courseid})["last_modif"]
         for filename, mftime in last_update.items():
-            if filename not in last_modif or last_modif[filename] < mftime:
+            if last_modif <mftime:
                 return True
+        # for filename, mftime in last_update.items():
+        #     if filename not in last_modif or last_modif[filename] < mftime:
+        #         return True
 
         return False
 
@@ -195,25 +204,30 @@ class CourseFactory(object):
                 if translations_fs.exists(lang + ".mo"):
                     last_modif["$i18n/" + lang + ".mo"] = translations_fs.get_last_modification_time(lang + ".mo")
 
-        self._cache[courseid] = (
-            self._course_class(courseid, course_descriptor, self.get_course_fs(courseid), self._task_factory, self._hook_manager),
-            last_modif
-        )
+        course = {"courseid":courseid,"course_descriptor":course_descriptor,"last_modif":self._filesystem.get_last_modification_time(path_to_descriptor)}
+        self._db.courses.insert_one(course)
+
+        # self._cache[courseid] = (
+        #     self._course_class(courseid, course_descriptor, self.get_course_fs(courseid), self._task_factory, self._hook_manager),
+        #     last_modif
+        # )
 
         self._task_factory.update_cache_for_course(courseid)
 
 
-def create_factories(fs_provider, task_problem_types, hook_manager=None, course_class=Course, task_class=Task):
+def create_factories(fs_provider, task_problem_types, hook_manager=None, course_class=Course, task_class=Task,db=None):
     """
     Shorthand for creating Factories
+
     :param fs_provider: A FileSystemProvider leading to the courses
     :param hook_manager: an Hook Manager instance. If None, a new Hook Manager is created
     :param course_class:
     :param task_class:
+    :param db:
     :return: a tuple with two objects: the first being of type CourseFactory, the second of type TaskFactory
     """
     if hook_manager is None:
         hook_manager = HookManager()
 
     task_factory = TaskFactory(fs_provider, hook_manager, task_problem_types, task_class)
-    return CourseFactory(fs_provider, task_factory, hook_manager, course_class), task_factory
+    return CourseFactory(fs_provider, task_factory, hook_manager, course_class,db), task_factory
