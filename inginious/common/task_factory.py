@@ -44,7 +44,6 @@ class TaskFactory(object):
             raise InvalidNameException("Task with invalid name: " + taskid)
         if self._cache_update_needed(course, taskid):
             self._update_cache(course, taskid)
-
         #return self._cache[(course.get_id(), taskid)][0]
         return self._db.tasks.find_one({"courseid":course.get_id(),"taskid":taskid})["task_content"]
 
@@ -204,7 +203,7 @@ class TaskFactory(object):
 
         task_fs = self.get_task_fs(course.get_id(), taskid)
 
-        if self._db.tasks.find_one({"courseid":course.get_id,"taskid":taskid}) is None:
+        if self._db.tasks.find_one({"courseid":course.get_id(),"taskid":taskid}) is None:
         #if (course.get_id(), taskid) not in self._cache:
             return True
 
@@ -214,7 +213,7 @@ class TaskFactory(object):
             raise TaskNotFoundException()
 
         #last_modif = self._cache[(course.get_id(), taskid)][1]
-        last_modif = self._db.tasks.find_one({"courseid":course.get_id,"taskid":taskid})["last_modif"]
+        last_modif = self._db.tasks.find_one({"courseid":course.get_id(),"taskid":taskid})["last_modif"]
         for filename, mftime in last_update.items():
             if filename not in last_modif or last_modif[filename] < mftime:
                 return True
@@ -263,7 +262,7 @@ class TaskFactory(object):
         last_modif, translation_fs, task_content = self._get_last_updates(course, taskid, task_fs, True)
 
         task = {"courseid":course.get_id(),"taskid":taskid,"task_content":self._task_class(course, taskid, task_content, task_fs, translation_fs, self._hook_manager, self._task_problem_types),"last_modif":last_modif}
-        self._db.tasks.insert_one(course)
+        self._db.tasks.insert_one(task)
         # self._cache[(course.get_id(), taskid)] = (
         #     self._task_class(course, taskid, task_content, task_fs, translation_fs, self._hook_manager, self._task_problem_types),
         #     last_modif

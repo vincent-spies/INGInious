@@ -236,6 +236,5 @@ def create_factories(fs_provider, task_problem_types, hook_manager=None, course_
         hook_manager = HookManager()
     if db is None:
         raise DatabaseErrorException("Something goes wrong with your database")
-
-    task_factory = TaskFactory(fs_provider, hook_manager, task_problem_types, task_class)
+    task_factory = TaskFactory(fs_provider, hook_manager, task_problem_types, task_class,db)
     return CourseFactory(fs_provider, task_factory, hook_manager, course_class,db), task_factory
