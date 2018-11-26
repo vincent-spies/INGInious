@@ -260,7 +260,7 @@ class BaseTaskPage(object):
                     return self.submission_to_json(task, result, is_admin, False, default_submissionid == result['_id'], tags=course.get_tags())
                 else:
                     web.header('Content-Type', 'application/json')
-                    return self.submission_to_json(task, result, is_admin)
+                    return self.submission_to_json(task, result, is_admin, False, False, {})
 
             elif "@action" in userinput and userinput["@action"] == "load_submission_input" and "submissionid" in userinput:
                 submission = self.submission_manager.get_submission(userinput["submissionid"], user_check=not is_staff)
@@ -293,7 +293,7 @@ class BaseTaskPage(object):
             else:
                 raise web.notfound()
 
-    def submission_to_json(self, task, data, debug, reloading=False, replace=False, tags=[]):
+    def submission_to_json(self, task, data, debug, reloading=False, replace=False):
         """ Converts a submission to json (keeps only needed fields) """
 
         if "ssh_host" in data:
