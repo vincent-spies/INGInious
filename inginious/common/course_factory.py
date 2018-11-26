@@ -11,7 +11,8 @@ from inginious.common.base import id_checker, get_json_or_yaml, loads_json_or_ya
 from inginious.common.task_factory import TaskFactory
 from inginious.common.tasks import Task
 from inginious.common.hook_manager import HookManager
-from inginious.common.exceptions import InvalidNameException, CourseNotFoundException, CourseUnreadableException, CourseAlreadyExistsException
+from inginious.common.exceptions import InvalidNameException, CourseNotFoundException, CourseUnreadableException, \
+    CourseAlreadyExistsException, DatabaseErrorException
 
 
 class CourseFactory(object):
@@ -33,6 +34,8 @@ class CourseFactory(object):
         """
         if not id_checker(courseid):
             raise InvalidNameException("Course with invalid name: " + courseid)
+        if self._db is None:
+            raise DatabaseErrorException("Something goes wrong with your database")
         if self._cache_update_needed(courseid):
             self._update_cache(courseid)
 
@@ -160,7 +163,8 @@ class CourseFactory(object):
         #    return True
         if self._db.courses.find_one({"courseid":courseid}) is None:
             return True
-
+        if self._db is None:
+            raise DatabaseErrorException("Something goes wrong with your database")
         try:
             descriptor_name = self._get_course_descriptor_path(courseid)
             last_update = {descriptor_name: self._filesystem.get_last_modification_time(descriptor_name)}
@@ -195,6 +199,8 @@ class CourseFactory(object):
             course_descriptor = loads_json_or_yaml(path_to_descriptor, self._filesystem.get(path_to_descriptor).decode("utf8"))
         except Exception as e:
             raise CourseUnreadableException(str(e))
+        if self._db is None:
+            raise DatabaseErrorException("Something goes wrong with your database")
 
         last_modif = {path_to_descriptor: self._filesystem.get_last_modification_time(path_to_descriptor)}
         translations_fs = self._filesystem.from_subfolder("$i18n")
@@ -228,6 +234,8 @@ def create_factories(fs_provider, task_problem_types, hook_manager=None, course_
     """
     if hook_manager is None:
         hook_manager = HookManager()
+    if db is None:
+        raise DatabaseErrorException("Something goes wrong with your database")
 
     task_factory = TaskFactory(fs_provider, hook_manager, task_problem_types, task_class)
     return CourseFactory(fs_provider, task_factory, hook_manager, course_class,db), task_factory

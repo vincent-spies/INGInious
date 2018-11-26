@@ -17,11 +17,12 @@ from inginious.common.exceptions import InvalidNameException, TaskNotFoundExcept
 class TaskFactory(object):
     """ Load courses from disk """
 
-    def __init__(self, filesystem: FileSystemProvider, hook_manager, task_problem_types, task_class=Task):
+    def __init__(self, filesystem: FileSystemProvider, hook_manager, task_problem_types, task_class=Task,db=None):
         self._filesystem = filesystem
         self._task_class = task_class
         self._hook_manager = hook_manager
-        self._cache = {}
+        #self._cache = {}
+        self._db = db
         self._task_file_managers = {}
         self._task_problem_types = task_problem_types
         self.add_custom_task_file_manager(TaskYAMLFileReader())
@@ -44,7 +45,8 @@ class TaskFactory(object):
         if self._cache_update_needed(course, taskid):
             self._update_cache(course, taskid)
 
-        return self._cache[(course.get_id(), taskid)][0]
+        #return self._cache[(course.get_id(), taskid)][0]
+        return self._db.tasks.find_one({"courseid":course.get_id(),"taskid":taskid})["task_content"]
 
     def get_task_descriptor_content(self, courseid, taskid):
         """
@@ -202,7 +204,8 @@ class TaskFactory(object):
 
         task_fs = self.get_task_fs(course.get_id(), taskid)
 
-        if (course.get_id(), taskid) not in self._cache:
+        if self._db.tasks.find_one({"courseid":course.get_id,"taskid":taskid}) is None:
+        #if (course.get_id(), taskid) not in self._cache:
             return True
 
         try:
@@ -210,7 +213,8 @@ class TaskFactory(object):
         except:
             raise TaskNotFoundException()
 
-        last_modif = self._cache[(course.get_id(), taskid)][1]
+        #last_modif = self._cache[(course.get_id(), taskid)][1]
+        last_modif = self._db.tasks.find_one({"courseid":course.get_id,"taskid":taskid})["last_modif"]
         for filename, mftime in last_update.items():
             if filename not in last_modif or last_modif[filename] < mftime:
                 return True
@@ -258,22 +262,25 @@ class TaskFactory(object):
         task_fs = self.get_task_fs(course.get_id(), taskid)
         last_modif, translation_fs, task_content = self._get_last_updates(course, taskid, task_fs, True)
 
-        self._cache[(course.get_id(), taskid)] = (
-            self._task_class(course, taskid, task_content, task_fs, translation_fs, self._hook_manager, self._task_problem_types),
-            last_modif
-        )
+        task = {"courseid":course.get_id(),"taskid":taskid,"task_content":self._task_class(course, taskid, task_content, task_fs, translation_fs, self._hook_manager, self._task_problem_types),"last_modif":last_modif}
+        self._db.tasks.insert_one(course)
+        # self._cache[(course.get_id(), taskid)] = (
+        #     self._task_class(course, taskid, task_content, task_fs, translation_fs, self._hook_manager, self._task_problem_types),
+        #     last_modif
+        # )
 
     def update_cache_for_course(self, courseid):
         """
         Clean/update the cache of all the tasks for a given course (id)
         :param courseid:
         """
-        to_drop = []
-        for (cid, tid) in self._cache:
-            if cid == courseid:
-                to_drop.append(tid)
-        for tid in to_drop:
-            del self._cache[(courseid, tid)]
+        self._db.tasks.delete_many({"courseid":courseid})
+        #to_drop = []
+        # for (cid, tid) in self._cache:
+        #     if cid == courseid:
+        #         to_drop.append(tid)
+        #for tid in to_drop:
+        #    del self._cache[(courseid, tid)]
 
     def delete_task(self, courseid, taskid):
         """

@@ -32,3 +32,6 @@ class TaskUnreadableException(Exception):
 
 class TaskReaderNotFoundException(Exception):
     pass
+
+class DatabaseErrorException(Exception):
+    pass
