@@ -45,7 +45,10 @@ class TaskFactory(object):
         if self._cache_update_needed(course, taskid):
             self._update_cache(course, taskid)
         #return self._cache[(course.get_id(), taskid)][0]
-        return self._db.tasks.find_one({"courseid":course.get_id(),"taskid":taskid})["task_content"]
+        t_c =  self._db.tasks.find_one({"courseid":course.get_id(),"taskid":taskid})["task_content"]
+        task_fs = self.get_task_fs(course.get_id(), taskid)
+        translations_fs = task_fs.from_subfolder("$i18n")
+        return self._task_class(course, taskid, t_c, task_fs, translations_fs, self._hook_manager, self._task_problem_types)
 
     def get_task_descriptor_content(self, courseid, taskid):
         """
@@ -215,7 +218,8 @@ class TaskFactory(object):
         #last_modif = self._cache[(course.get_id(), taskid)][1]
         last_modif = self._db.tasks.find_one({"courseid":course.get_id(),"taskid":taskid})["last_modif"]
         for filename, mftime in last_update.items():
-            if filename not in last_modif or last_modif[filename] < mftime:
+            #if filename not in last_modif or last_modif[filename] < mftime:
+            if last_modif <mftime:
                 return True
 
         return False
@@ -260,8 +264,8 @@ class TaskFactory(object):
 
         task_fs = self.get_task_fs(course.get_id(), taskid)
         last_modif, translation_fs, task_content = self._get_last_updates(course, taskid, task_fs, True)
-
-        task = {"courseid":course.get_id(),"taskid":taskid,"task_content":self._task_class(course, taskid, task_content, task_fs, translation_fs, self._hook_manager, self._task_problem_types),"last_modif":last_modif}
+        last_modif = list(last_modif.values())[0]
+        task = {"courseid":course.get_id(),"taskid":taskid,"task_content":task_content,"last_modif":last_modif}
         self._db.tasks.insert_one(task)
         # self._cache[(course.get_id(), taskid)] = (
         #     self._task_class(course, taskid, task_content, task_fs, translation_fs, self._hook_manager, self._task_problem_types),
