@@ -9,11 +9,13 @@ $var title: $:_("Job queue")
 
 $# Start content
 $def NavbarF():
-    <ol class="nav navbar-nav nav-breadcrumb">
-        <li class="active"><a href="#"><i class="fa fa-dashboard"></i> $:_("Job queue")
-            <span class="sr-only">$:_("(current)")</span></a>
-        </li>
-    </ol>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item active"><a href="#"><i class="fa fa-dashboard"></i> $:_("Job queue")
+                <span class="sr-only">$:_("(current)")</span></a>
+            </li>
+        </ol>
+    </nav>
 $var Navbar: $:NavbarF()
 
 <h2>$:_("Job queue")</h2>

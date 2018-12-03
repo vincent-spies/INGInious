@@ -51,27 +51,29 @@ class CourseEditTask(INGIniousAdminPage):
             pass
         available_filetypes = self.task_factory.get_available_task_file_extensions()
 
+        additional_tabs = self.plugin_manager.call_hook('task_editor_tab', course=course, taskid=taskid,
+                                                        task_data=task_data, template_helper=self.template_helper)
+
         return self.template_helper.get_renderer().course_admin.task_edit(
             course,
             taskid,
             self.task_factory.get_problem_types(),
             task_data,
             environments,
-            json.dumps(
-                task_data.get(
-                    'problems',
-                    {})),
+            task_data.get('problems',{}),
             self.contains_is_html(task_data),
             current_filetype,
             available_filetypes,
             AccessibleTime,
-            CourseTaskFiles.get_task_filelist(self.task_factory, courseid, taskid))
+            CourseTaskFiles.get_task_filelist(self.task_factory, courseid, taskid),
+            additional_tabs
+        )
 
     @classmethod
     def contains_is_html(cls, data):
         """ Detect if the problem has at least one "xyzIsHTML" key """
         for key, val in data.items():
-            if key.endswith("IsHTML"):
+            if isinstance(key, str) and key.endswith("IsHTML"):
                 return True
             if isinstance(val, (OrderedDict, dict)) and cls.contains_is_html(val):
                 return True
@@ -152,13 +154,13 @@ class CourseEditTask(INGIniousAdminPage):
 
             problems = self.dict_from_prefix("problem", data)
             limits = self.dict_from_prefix("limits", data)
-            
+
             #Tags
             tags = self.dict_from_prefix("tags", data)
             if tags is None:
                 tags = {}
             tags = OrderedDict(sorted(tags.items(), key=lambda item: item[0])) # Sort by key
-            
+
             # Repair tags
             for k in tags:
                 tags[k]["visible"] = ("visible" in tags[k])  # Since unckecked checkboxes are not present here, we manually add them to avoid later errors
@@ -169,12 +171,12 @@ class CourseEditTask(INGIniousAdminPage):
                     tags[k]["id"] = "" # Force no id if organisational tag
 
             # Remove uncompleted tags (tags with no name or no id)
-            for k in list(tags.keys()): 
+            for k in list(tags.keys()):
                 if (tags[k]["id"] == "" and tags[k]["type"] != 2) or tags[k]["name"] == "":
                     del tags[k]
-            
+
             # Find duplicate ids. Return an error if some tags use the same id.
-            for k in tags: 
+            for k in tags:
                 if tags[k]["type"] != 2: # Ignore organisational tags since they have no id.
                     count = 0
                     id = str(tags[k]["id"])
@@ -186,7 +188,7 @@ class CourseEditTask(INGIniousAdminPage):
                         if tags[k2]["type"] != 2 and tags[k2]["id"] == id:
                             count = count+1
                     if count > 1:
-                        return json.dumps({"status": "error", "message": _("Some tags have the same id! The id of a tag must be unique.")})                
+                        return json.dumps({"status": "error", "message": _("Some tags have the same id! The id of a tag must be unique.")})
 
             data = {key: val for key, val in data.items() if
                     not key.startswith("problem")
@@ -203,10 +205,10 @@ class CourseEditTask(INGIniousAdminPage):
 
             # Parse and order the problems (also deletes @order from the result)
             if problems is None:
-                return json.dumps({"status": "error", "message": _("You cannot create a task without subproblems")})
-
-            data["problems"] = OrderedDict([(key, self.parse_problem(val))
-                                            for key, val in sorted(iter(problems.items()), key=lambda x: int(x[1]['@order']))])
+                data["problems"] = OrderedDict([])
+            else:
+                data["problems"] = OrderedDict([(key, self.parse_problem(val))
+                                                for key, val in sorted(iter(problems.items()), key=lambda x: int(x[1]['@order']))])
 
             # Task limits
             data["limits"] = limits
@@ -257,7 +259,7 @@ class CourseEditTask(INGIniousAdminPage):
                 del data["submission_limit_soft_0"]
                 del data["submission_limit_soft_1"]
                 data["submission_limit"] = result
-                                
+
             # Accessible
             if data["accessible"] == "custom":
                 data["accessible"] = "{}/{}".format(data["accessible_start"], data["accessible_end"])
@@ -292,8 +294,18 @@ class CourseEditTask(INGIniousAdminPage):
 
         task_fs = self.task_factory.get_task_fs(courseid, taskid)
         task_fs.ensure_exists()
+
+        # Call plugins and return the first error
+        plugin_results = self.plugin_manager.call_hook('task_editor_submit', course=course, taskid=taskid,
+                                                       task_data=data, task_fs=task_fs)
+
+        # Retrieve the first non-null element
+        error = next(filter(None, plugin_results), None)
+        if error is not None:
+            return error
+
         try:
-            WebAppTask(course, taskid, data, task_fs, self.plugin_manager, self.task_factory.get_problem_types())
+            WebAppTask(course, taskid, data, task_fs, None, self.plugin_manager, self.task_factory.get_problem_types())
         except Exception as message:
             return json.dumps({"status": "error", "message": _("Invalid data: {}").format(str(message))})
 
@@ -314,5 +326,5 @@ class CourseEditTask(INGIniousAdminPage):
         self.task_factory.delete_all_possible_task_files(courseid, taskid)
         self.task_factory.update_task_descriptor_content(courseid, taskid, data, force_extension=file_ext)
         course.update_all_tags_cache()
-        
+
         return json.dumps({"status": "ok"})

@@ -27,7 +27,8 @@ install_requires = [
     "msgpack-python >= 0.4.7",
     "natsort >= 5.0.1",
     "psutil >= 4.4.2",
-    "zipstream >= 1.1.4"
+    "zipstream >= 1.1.4",
+    "WsgiDAV >= 2.2.4"
 ]
 
 test_requires = [
@@ -68,12 +69,11 @@ setup(
         'inginious-agent-mcq',
         'inginious-backend',
         'inginious-webapp',
+        'inginious-webdav',
         'inginious-install',
-        'utils/check_task_description/inginious-check-task',
         'utils/sync/inginious-synchronize',
-        'utils/task_tester/inginious-test-task',
-        'utils/task_converter/inginious-old-task-converter',
-        'utils/container_update/inginious-container-update'
+        'utils/container_update/inginious-container-update',
+        'utils/database_updater/inginious-database-update'
     ],
 
     include_package_data=True,
@@ -82,5 +82,5 @@ setup(
     author_email="inginious@info.ucl.ac.be",
     license="AGPL 3",
     url="https://github.com/UCL-INGI/INGInious",
-    long_description=open(os.path.join(os.path.dirname(__file__), 'README.rst')).read()
+    long_description=open(os.path.join(os.path.dirname(__file__), 'README.rst'), encoding='utf8').read()
 )

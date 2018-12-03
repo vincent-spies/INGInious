@@ -104,6 +104,8 @@ class CodeProblem(Problem):
         else:
             self._language = "plain"
 
+        self._default = content.get("default", "")
+
     def input_type(self):
         return str
 
@@ -135,7 +137,9 @@ class CodeProblem(Problem):
 
     @classmethod
     def get_text_fields(cls):
-        return Problem.get_text_fields().update({"header": True})
+        fields = Problem.get_text_fields()
+        fields.update({"header": True})
+        return fields
 
 
 class CodeSingleLineProblem(CodeProblem):
@@ -196,7 +200,9 @@ class FileProblem(Problem):
 
     @classmethod
     def get_text_fields(cls):
-        return CodeProblem.get_text_fields().update({"header": True})
+        fields = Problem.get_text_fields()
+        fields.update({"header": True})
+        return fields
 
 
 class MultipleChoiceProblem(Problem):
@@ -346,9 +352,9 @@ class MultipleChoiceProblem(Problem):
 
     @classmethod
     def get_text_fields(cls):
-        result = Problem.get_text_fields()
-        result.update({"header": True, "success_message": True, "error_message": True, "choices": [{"text": True, "feedback": True}]})
-        return result
+        fields = Problem.get_text_fields()
+        fields.update({"header": True, "success_message": True, "error_message": True, "choices": [{"text": True, "feedback": True}]})
+        return fields
 
 
 class MatchProblem(Problem):
@@ -383,4 +389,6 @@ class MatchProblem(Problem):
 
     @classmethod
     def get_text_fields(cls):
-        return Problem.get_text_fields().update({"header": True})
+        fields = Problem.get_text_fields()
+        fields.update({"header": True})
+        return fields

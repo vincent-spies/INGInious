@@ -31,6 +31,7 @@ class CourseSettings(INGIniousAdminPage):
             course_content['name'] = data['name']
             if course_content['name'] == "":
                 errors.append(_('Invalid name'))
+            course_content['description'] = data['description']
             course_content['admins'] = list(map(str.strip, data['admins'].split(',')))
             if not self.user_manager.user_is_superadmin() and self.user_manager.session_username() not in course_content['admins']:
                 errors.append(_('You cannot remove yourself from the administrators of this course'))
@@ -81,10 +82,10 @@ class CourseSettings(INGIniousAdminPage):
                 errors.append(_('Invalid ACL value'))
             if course_content['registration_ac'] == "None":
                 course_content['registration_ac'] = None
-            course_content['registration_ac_list'] = data['registration_ac_list'].split("\n")
+            course_content['registration_ac_list'] = data['registration_ac_list'].splitlines()
 
             course_content['is_lti'] = 'lti' in data and data['lti'] == "true"
-            course_content['lti_keys'] = dict([x.split(":") for x in data['lti_keys'].split("\n") if x])
+            course_content['lti_keys'] = dict([x.split(":") for x in data['lti_keys'].splitlines() if x])
 
             for lti_key in course_content['lti_keys'].keys():
                 if not re.match("^[a-zA-Z0-9]*$", lti_key):

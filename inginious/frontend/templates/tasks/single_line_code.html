@@ -1,9 +1,10 @@
-$def with (inputId,header,type,maxChars,optional)
+$def with (inputId,header,type,maxChars,optional,default)
 
 $#
 $# This file is part of INGInious. See the LICENSE and the COPYRIGHTS files for
 $# more information about the licensing of this file.
 $#
+<div id="task_alert_$inputId" class="task_alert_problem"></div>
 $:header
 <input
     $if type== "text":
@@ -13,7 +14,7 @@ $:header
     $elif type == "decimal":
         type="number"
     name="$inputId"
-    value=""
+    value="$default"
     $if "/" in inputId:
         class="monospace form-control form-inline"
     $else:

@@ -127,7 +127,7 @@ class BackendJobDone(metaclass=MessageMeta, msgtype="backend_job_done"):
     """
 
     def __init__(self, job_id: ClientJobId, result: SPResult, grade: float, problems: Dict[str, SPResult], tests: Dict[str, Any],
-                 custom: Dict[str, Any], archive: Optional[bytes], stdout: Optional[str], stderr: Optional[str]):
+                 custom: Dict[str, Any], state: str, archive: Optional[bytes], stdout: Optional[str], stderr: Optional[str]):
         """
         :param job_id: the client-side job id associated with this job
         :param result: A tuple containing the result type and the text to be shown to the student
@@ -153,6 +153,7 @@ class BackendJobDone(metaclass=MessageMeta, msgtype="backend_job_done"):
         self.problems = problems
         self.tests = tests
         self.custom = custom
+        self.state = state
         self.archive = archive
         self.stdout = stdout
         self.stderr = stderr
@@ -272,7 +273,7 @@ class AgentHello(metaclass=MessageMeta, msgtype="agent_hello"):
         Let the agent say hello and announce which containers it has available
     """
 
-    def __init__(self, friendly_name: str, available_job_slots: int, available_containers: Dict[str, Dict[str, str]]):
+    def __init__(self, friendly_name: str, available_job_slots: int, available_containers: Dict[str, Dict[str, Any]]):
         """
             :param friendly_name: a string containing a friendly name to identify agent
             :param available_job_slots: an integer giving the number of concurrent
@@ -281,6 +282,7 @@ class AgentHello(metaclass=MessageMeta, msgtype="agent_hello"):
                 "name": {                          #for example, "default"
                     "id": "container img id",      #             "sha256:715c5cb5575cdb2641956e42af4a53e69edf763ce701006b2c6e0f4f39b68dd3"
                     "created": 12345678            # create date
+                    "ports": [22, 434]             # list of ports needed
                 }
             }
         """
@@ -309,7 +311,7 @@ class AgentJobDone(metaclass=MessageMeta, msgtype="agent_job_done"):
     """
 
     def __init__(self, job_id: BackendJobId, result: SPResult, grade: float, problems: Dict[str, SPResult], tests: Dict[str, Any],
-                 custom: Dict[str, Any], archive: Optional[bytes], stdout: Optional[str], stderr: Optional[str]):
+                 custom: Dict[str, Any], state: str, archive: Optional[bytes], stdout: Optional[str], stderr: Optional[str]):
         """
         :param job_id: the backend-side job id associated with this job
         :param result: a tuple that contains the result itself, either:
@@ -335,6 +337,7 @@ class AgentJobDone(metaclass=MessageMeta, msgtype="agent_job_done"):
         self.problems = problems
         self.tests = tests
         self.custom = custom
+        self.state = state
         self.archive = archive
         self.stdout = stdout
         self.stderr = stderr

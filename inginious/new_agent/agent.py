@@ -228,44 +228,47 @@ class Agent(object):
         self._logger.info("Agent started")
         self._loop.create_task(self._register())
 
-        while not self.__closing:
-            submission = await self._get_next_submission()
+        try:
+            while not self.__closing:
+                submission = await self._get_next_submission()
 
-            # copy part of the submission. The dictionary might be modified by a grading unit.
-            try:
-                submission_id = submission["_id"]
-                self.__current_submissionid = submission_id
-                grading_steps = submission["grading_steps"]
-                grading_step_idx = submission["next_grading_step_idx"]
+                # copy part of the submission. The dictionary might be modified by a grading unit.
+                try:
+                    submission_id = submission["_id"]
+                    self.__current_submissionid = submission_id
+                    grading_steps = submission["grading_steps"]
+                    grading_step_idx = submission["next_grading_step_idx"]
 
-                send_message = lambda p: self._send_message_frontend(submission_id, p)
+                    send_message = lambda p: self._send_message_frontend(submission_id, p)
 
-                # Create the grading unit
-                grading_unit = self.__envs[submission["next_grading_step"]](submission, send_message, self)
-                await grading_unit.init()
-            except:
-                self._logger.exception("Probably malformed submission!")
-                continue
+                    # Create the grading unit
+                    grading_unit = self.__envs[submission["next_grading_step"]](submission, send_message, self)
+                    await grading_unit.init()
+                except:
+                    self._logger.exception("Probably malformed submission!")
+                    continue
 
-            # Start the message handler for this task
-            message_handler = asyncio.ensure_future(self._message_handler(submission_id, grading_unit))
+                # Start the message handler for this task
+                message_handler = asyncio.ensure_future(self._message_handler(submission_id, grading_unit))
 
-            try:
-                # Grade
-                out = await grading_unit.grade()
-                error = False
-            except:
-                self._logger.exception("Error while grading submission")
-                out = {}
-                error = True
+                try:
+                    # Grade
+                    out = await grading_unit.grade()
+                    error = False
+                except:
+                    self._logger.exception("Error while grading submission")
+                    out = {}
+                    error = True
 
-            # Close the message handler
-            if not message_handler.done():
-                message_handler.cancel()
+                # Close the message handler
+                if not message_handler.done():
+                    message_handler.cancel()
 
-            try:
-                self.__current_submissionid = None  # disables _register()
-                await self._store_results(submission_id, grading_steps, grading_step_idx, out, error)
-                await self._cleanup(submission["_id"])
-            except:
-                self._logger.exception("Error while storing grading results")
+                try:
+                    self.__current_submissionid = None  # disables _register()
+                    await self._store_results(submission_id, grading_steps, grading_step_idx, out, error)
+                    await self._cleanup(submission["_id"])
+                except:
+                    self._logger.exception("Error while storing grading results")
+        except:
+            self._logger.exception("Unexpected exception")

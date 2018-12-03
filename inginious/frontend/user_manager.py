@@ -14,6 +14,8 @@ from functools import reduce
 from natsort import natsorted
 from collections import OrderedDict
 import pymongo
+from binascii import hexlify
+import os
 
 
 class AuthInvalidInputException(Exception):
@@ -161,6 +163,10 @@ class UserManager:
     def session_language(self):
         """ Returns the current session language """
         return self._session.get("language", "en")
+
+    def session_api_key(self):
+        """ Returns the API key for the current user. Created on first demand. """
+        return self.get_user_api_key(self.session_username())
 
     def set_session_token(self, token):
         """ Sets the token of the current user in the session, if one is open."""
@@ -336,6 +342,25 @@ class UserManager:
             return info[1]
         return None
 
+    def get_user_api_key(self, username, create=True):
+        """
+        Get the API key of a given user.
+        API keys are generated on demand.
+        :param username:
+        :param create: Create the API key if none exists yet
+        :return: the API key assigned to the user, or None if none exists and create is False.
+        """
+        retval = self._database.users.find_one({"username": username}, {"apikey": 1})
+        if "apikey" not in retval and create:
+            apikey = self.generate_api_key()
+            self._database.users.update_one({"username": username}, {"$set": {"apikey": apikey}})
+        elif "apikey" not in retval:
+            apikey = None
+        else:
+            apikey = retval["apikey"]
+        return apikey
+
+
     def bind_user(self, auth_id, user):
         username, realname, email = user
 
@@ -494,7 +519,7 @@ class UserManager:
         """ Set in the database that the user has viewed this task """
         self._database.user_tasks.update({"username": username, "courseid": courseid, "taskid": taskid},
                                          {"$setOnInsert": {"username": username, "courseid": courseid, "taskid": taskid,
-                                                           "tried": 0, "succeeded": False, "grade": 0.0, "submissionid": None}},
+                                                           "tried": 0, "succeeded": False, "grade": 0.0, "submissionid": None, "state": ""}},
                                          upsert=True)
 
     def update_user_stats(self, username, task, submission, newsub):
@@ -503,7 +528,9 @@ class UserManager:
 
         if newsub:
             old_submission = self._database.user_tasks.find_one_and_update(
-                {"username": username, "courseid": submission["courseid"], "taskid": submission["taskid"]}, {"$inc": {"tried": 1, "tokens.amount": 1}})
+                {"username": username, "courseid": submission["courseid"], "taskid": submission["taskid"]},
+                {"$inc": {"tried": 1, "tokens.amount": 1}}
+            )
 
             # Check if the submission is the default download
             set_default = task.get_evaluate() == 'last' or \
@@ -513,7 +540,9 @@ class UserManager:
             if set_default:
                 self._database.user_tasks.find_one_and_update(
                     {"username": username, "courseid": submission["courseid"], "taskid": submission["taskid"]},
-                    {"$set": {"succeeded": submission["result"] == "success", "grade": submission["grade"], "submissionid": submission['_id']}})
+                    {"$set": {"succeeded": submission["result"] == "success", "grade": submission["grade"],
+                              "state": submission["state"], "submissionid": submission['_id']}}
+                )
         else:
             old_submission = self._database.user_tasks.find_one(
                 {"username": username, "courseid": submission["courseid"], "taskid": submission["taskid"]})
@@ -527,11 +556,20 @@ class UserManager:
                 if len(def_sub) > 0:
                     self._database.user_tasks.find_one_and_update(
                         {"username": username, "courseid": submission["courseid"], "taskid": submission["taskid"]},
-                        {"$set": {"succeeded": def_sub[0]["result"] == "success", "grade": def_sub[0]["grade"], "submissionid": def_sub[0]['_id']}})
+                        {"$set": {
+                            "succeeded": def_sub[0]["result"] == "success",
+                            "grade": def_sub[0]["grade"],
+                            "state": def_sub[0]["state"],
+                            "submissionid": def_sub[0]['_id']
+                        }})
             elif old_submission["submissionid"] == submission["_id"]:  # otherwise, update cache if needed
                 self._database.user_tasks.find_one_and_update(
                     {"username": username, "courseid": submission["courseid"], "taskid": submission["taskid"]},
-                    {"$set": {"succeeded": submission["result"] == "success", "grade": submission["grade"]}})
+                    {"$set": {
+                        "succeeded": submission["result"] == "success",
+                        "grade": submission["grade"],
+                        "state": submission["state"]
+                    }})
 
     def task_is_visible_by_user(self, task, username=None, lti=None):
         """ Returns true if the task is visible by the user
@@ -705,8 +743,11 @@ class UserManager:
         if not course.get_accessibility().is_open() or (not self.course_is_user_registered(course, username) and not course.allow_preview()):
             return False
 
-        if lti is not None and course.is_lti() != lti:
+        if lti and course.is_lti() != lti:
             return False
+
+        if lti is False and course.is_lti():
+            return not course.lti_send_back_grade()
 
         return True
 
@@ -782,3 +823,7 @@ class UserManager:
             username = self.session_username()
 
         return (username in course.get_staff()) or (include_superadmins and self.user_is_superadmin(username))
+
+    @classmethod
+    def generate_api_key(cls):
+        return hexlify(os.urandom(40)).decode('utf-8')

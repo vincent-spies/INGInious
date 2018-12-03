@@ -29,7 +29,7 @@ class GUDemo(GradingUnit):
         print("Message", message)
 
     async def grade(self):
-        await asyncio.sleep(600)
+        #await asyncio.sleep(600)
         return {"result": "success", "text": self.submission.get("text", "") + "Processed by {}\n".format(self.name)}
 create_gudemo = lambda name: (lambda a,b,c: GUDemo(a,b,c,name))
 

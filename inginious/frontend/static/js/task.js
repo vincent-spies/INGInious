@@ -192,8 +192,9 @@ function setSelectedSubmission(id, fade, makepost) {
         var applyfn = function (data) {
             if ('status' in data && data['status'] == 'done') {
                 var submission_link = jQuery('<a/>', {
+                    href: "#",
                     id: "my_submission",
-                    class: "submission list-group-item list-group-item-info",
+                    class: "submission list-group-item list-group-item-action list-group-item-info",
                     "data-submission-id": id
                 }).on('click', clickOnSubmission);
 
@@ -431,7 +432,7 @@ function waitForSubmission(submissionid)
                 }
                 else
                 {
-                    displayTaskStudentAlertWithProblems($("#internalerror").text(), "danger", false);
+                    displayTaskStudentAlertWithProblems(data, "danger", false);
                     updateSubmission(submissionid, "error", "0.0", []);
                     updateTaskStatus("Failed", 0);
                     unblurTaskForm();
@@ -440,7 +441,7 @@ function waitForSubmission(submissionid)
             })
             .fail(function()
             {
-                displayTaskStudentAlertWithProblems($("#internalerror").text(), "danger", false);
+                displayTaskStudentAlertWithProblems(data, "danger", false);
                 updateSubmission(submissionid, "error", "0.0", []);
                 updateTaskStatus("Failed", 0);
                 unblurTaskForm();
@@ -589,21 +590,10 @@ function displayTaskStudentAlertWithProblems(content, type)
 
     if("problems" in content)
     {
-        $(".task_alert_problem").each(function(key, elem)
-        {
-            var problemid = elem.id.substr(11); //skip "task_alert."
+        for(var problemid in problems_types) {
             if(problemid in content.problems)
-            {
-                var alert_type = "danger";
-                if(content.problems[problemid][0] == "timeout" || content.problems[problemid][0] == "overflow")
-                    alert_type = "warning";
-                if(content.problems[problemid][0] == "success")
-                    alert_type = "success";
-                $(elem).html(getAlertCode(content.problems[problemid][1], alert_type, true));
-                if(firstPos == -1 || firstPos > $(elem).offset().top)
-                    firstPos = $(elem).offset().top;
-            }
-        });
+                window["load_feedback_" + problems_types[problemid]](problemid, content["problems"][problemid]);
+        }
     }
 
     $('html, body').animate(
@@ -615,12 +605,37 @@ function displayTaskStudentAlertWithProblems(content, type)
     MathJax.Hub.Queue(["Typeset",MathJax.Hub]);
 }
 
+function load_feedback_code(key, content) {
+    var alert_type = "danger";
+    if(content[0] == "timeout" || content[0] == "overflow")
+        alert_type = "warning";
+    if(content[0] == "success")
+        alert_type = "success";
+    $("#task_alert_" + key).html(getAlertCode(content[1], alert_type, true));
+}
+
+function load_feedback_file(key, content) {
+    load_feedback_code(key, content);
+}
+
+function load_feedback_match(key, content) {
+    load_feedback_code(key, content);
+}
+
+function load_feedback_code_single_line(key, content) {
+    load_feedback_code(key, content);
+}
+
+function load_feedback_multiple_choice(key, content) {
+    load_feedback_code(key, content);
+}
+
 //Create an alert
 //type is either alert, info, danger, warning
 //dismissible is a boolean
 function getAlertCode(content, type, dismissible)
 {
-    var a = '<div class="alert fade in ';
+    var a = '<div class="alert fade show ';
     if(dismissible)
         a += 'alert-dismissible ';
     a += 'alert-' + type + '" role="alert">';
@@ -786,7 +801,7 @@ function updateMainTags(data){
 
     //Reset all tags to info style (blue) to avoid no-updated colors
     $('span', $('#main_tag_group')).each(function() {
-        //If this is a alert-danger class, this is an antitag
+        //If this is a alert-danger class, this is an misconception
         if($(this).attr('class') == "badge alert-danger"){
             $(this).hide();
         }else if($(this).attr('class') == "badge alert-default"){
@@ -802,7 +817,7 @@ function updateMainTags(data){
             //Get and update the color of HTML nodes that represent tags
             var elem = $('#'.concat(tag.replace("*", "\\*"))); //The * makes error with JQuery so, we escape it.
             if(data["tests"][tag]){
-                //If this is a alert-danger class, this is an antitag
+                //If this is a alert-danger class, this is an misconception
                 if(elem.attr('class') == "badge alert-danger"){
                     elem.show();
                 }else{
@@ -837,7 +852,7 @@ function updateTagsToNewSubmission(elem, data){
     $('span', $('#main_tag_group')).each(function() {
         var id = $(this).attr("id");
         var color = $(this).attr("class");
-        //Only consider normal tag (we do not consider antitag)
+        //Only consider normal tag (we do not consider misconception
         if(color != "badge alert-danger"){
             if(id in data && data[id]){
                 n_ok++;

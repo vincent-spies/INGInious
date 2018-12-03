@@ -5,18 +5,18 @@
 
 """ Starts the webapp """
 import builtins
-import gettext
+import pymongo
 
 import inginious.frontend.pages.course_admin.utils as course_admin_utils
 import web
 from inginious.frontend.fix_webpy_cookies import fix_webpy_cookies
+
 fix_webpy_cookies() # TODO: remove me once https://github.com/webpy/webpy/pull/419 is merge in web.py
 
 from gridfs import GridFS
 from inginious.frontend.arch_helper import create_arch, start_asyncio
 from inginious.frontend.cookieless_app import CookieLessCompatibleApplication
 from inginious.frontend.courses import WebAppCourse
-from inginious.frontend.database_updater import update_database
 from inginious.frontend.plugin_manager import PluginManager
 from inginious.frontend.session_mongodb import MongoStore
 from inginious.frontend.submission_manager import WebAppSubmissionManager
@@ -75,6 +75,7 @@ urls = (
     r'/admin/([^/]+)/download', 'inginious.frontend.pages.course_admin.download.CourseDownloadSubmissions',
     r'/admin/([^/]+)/replay', 'inginious.frontend.pages.course_admin.replay.CourseReplaySubmissions',
     r'/admin/([^/]+)/danger', 'inginious.frontend.pages.course_admin.danger_zone.CourseDangerZonePage',
+    r'/admin/([^/]+)/webdav', 'inginious.frontend.pages.course_admin.webdav.WebDavInfoPage',
     r'/api/v0/auth_methods', 'inginious.frontend.pages.api.auth_methods.APIAuthMethods',
     r'/api/v0/authentication', 'inginious.frontend.pages.api.authentication.APIAuthentication',
     r'/api/v0/courses', 'inginious.frontend.pages.api.courses.APICourses',
@@ -129,6 +130,21 @@ def get_app(config):
     # another link to the database to be used in asyncio
     motor_mongo_client = motor.AsyncIOMotorClient(db_host)
     motor_database = motor_mongo_client[db_name]
+
+    # Init database if needed
+    db_version = database.db_version.find_one({})
+    if db_version is None:
+        database.submissions.ensure_index([("username", pymongo.ASCENDING)])
+        database.submissions.ensure_index([("courseid", pymongo.ASCENDING)])
+        database.submissions.ensure_index([("courseid", pymongo.ASCENDING), ("taskid", pymongo.ASCENDING)])
+        database.submissions.ensure_index([("submitted_on", pymongo.DESCENDING)])  # sort speed
+        database.user_tasks.ensure_index(
+            [("username", pymongo.ASCENDING), ("courseid", pymongo.ASCENDING), ("taskid", pymongo.ASCENDING)],
+            unique=True)
+        database.user_tasks.ensure_index([("username", pymongo.ASCENDING), ("courseid", pymongo.ASCENDING)])
+        database.user_tasks.ensure_index([("courseid", pymongo.ASCENDING), ("taskid", pymongo.ASCENDING)])
+        database.user_tasks.ensure_index([("courseid", pymongo.ASCENDING)])
+        database.user_tasks.ensure_index([("username", pymongo.ASCENDING)])
 
     appli = CookieLessCompatibleApplication(MongoStore(database, 'sessions'))
 
@@ -207,9 +223,6 @@ def get_app(config):
         web.config.smtp_password = smtp_conf.get("password", "")
         web.config.smtp_sendername = smtp_conf.get("sendername", "no-reply@inginious.org")
 
-    # Update the database
-    update_database(database, gridfs, course_factory, user_manager)
-
     # Add some helpers for the templates
     template_helper.add_to_template_globals("_", _)
     template_helper.add_to_template_globals("str", str)
@@ -252,6 +265,7 @@ def get_app(config):
     appli.available_languages = available_languages
     appli.welcome_page = config.get("welcome_page", None)
     appli.static_directory = config.get("static_directory", "./static")
+    appli.webdav_host = config.get("webdav_host", None)
 
     # Init the mapping of the app
     appli.init_mapping(urls)
