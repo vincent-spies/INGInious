@@ -21,7 +21,7 @@ from inginious.common.course_factory import CourseFactory
 from inginious.common.task_factory import TaskFactory
 from inginious.frontend.lti_outcome_manager import LTIOutcomeManager
 from inginious.frontend.web_utils import not_acceptable_exception, see_other_exception, webinput, webenv, \
-    not_found_exception
+    not_found_exception, webdict
 
 
 class INGIniousPage(object):

@@ -48,7 +48,7 @@ def webinput(*requireds, _method="both", _raw=False, **defaults):
         return web.storify(data, *requireds, **defaults)
 
 def add_header(header, value, unique=False):
-    web.header(header, value)
+    web.header(header, value, unique)
 
 def websafe(string):
     return web.websafe(string)
