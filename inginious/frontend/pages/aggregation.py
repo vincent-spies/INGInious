@@ -7,10 +7,10 @@
 
 import logging
 
-import web
 from bson.objectid import ObjectId
 
 from inginious.frontend.pages.utils import INGIniousAuthPage
+from inginious.frontend.web_utils import not_found_exception, webinput
 
 
 class AggregationPage(INGIniousAuthPage):
@@ -27,9 +27,9 @@ class AggregationPage(INGIniousAuthPage):
         error = False
         change = False
         msg = ""
-        data = web.input()
+        data = webinput()
         if self.user_manager.has_staff_rights_on_course(course):
-            raise web.notfound()
+            raise not_found_exception()
         elif not self.user_manager.course_is_open_to_user(course, lti=False):
             return self.template_helper.get_renderer().course_unavailable()
         elif "register_group" in data:

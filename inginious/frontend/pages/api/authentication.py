@@ -5,9 +5,8 @@
 
 """ Authentication """
 
-import web
-
 from inginious.frontend.pages.api._api_page import APIPage, APIInvalidArguments
+from inginious.frontend.web_utils import webinput
 
 
 class APIAuthentication(APIPage):
@@ -43,7 +42,7 @@ class APIAuthentication(APIPage):
             Response: a dict in the form {"status": "success"} (200 OK) or {"status": "error"} (403 Forbidden)
         """
 
-        user_input = web.input()
+        user_input = webinput()
         if "auth_method_id" not in user_input:
             raise APIInvalidArguments()
 

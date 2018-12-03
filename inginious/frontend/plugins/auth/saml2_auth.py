@@ -8,12 +8,12 @@
 import copy
 import logging
 
-import web
 from onelogin.saml2.auth import OneLogin_Saml2_Auth
 from onelogin.saml2.utils import OneLogin_Saml2_Utils
 
 from inginious.frontend.pages.utils import INGIniousPage
 from inginious.frontend.user_manager import AuthMethod
+from inginious.frontend.web_utils import webinput, webdict, add_header
 
 settings = None
 
@@ -49,7 +49,7 @@ class SAMLAuthMethod(AuthMethod):
 
     def callback(self, auth_storage):
         req = prepare_request(self._settings)
-        input_data = web.input()
+        input_data = webinput()
 
         auth = OneLogin_Saml2_Auth(req, self._settings)
         auth.process_response()
@@ -100,22 +100,22 @@ def prepare_request(settings):
 
     # Set the ACS url and binding method
     settings["sp"]["assertionConsumerService"] = {
-        "url": web.ctx.homedomain + web.ctx.homepath + "/auth/callback/" + settings["id"],
+        "url": webdict().homedomain + webdict().homepath + "/auth/callback/" + settings["id"],
         "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
     }
 
     # If server is behind proxys or balancers use the HTTP_X_FORWARDED fields
-    data = web.input()
+    data = webinput()
     return {
-        'https': 'on' if web.ctx.protocol == 'https' else 'off',
-        'http_host': web.ctx.environ["SERVER_NAME"],
-        'server_port': web.ctx.environ["SERVER_PORT"],
-        'script_name': web.ctx.homepath,
+        'https': 'on' if webdict().protocol == 'https' else 'off',
+        'http_host': webdict().environ["SERVER_NAME"],
+        'server_port': webdict().environ["SERVER_PORT"],
+        'script_name': webdict().homepath,
         'get_data': data.copy(),
         'post_data': data.copy(),
         # Uncomment if using ADFS as IdP, https://github.com/onelogin/python-saml/pull/144
         # 'lowercase_urlencoding': True,
-        'query_string': web.ctx.query
+        'query_string': webdict().query
     }
 
 
@@ -127,10 +127,10 @@ class MetadataPage(INGIniousPage):
         errors = auth.get_settings().validate_metadata(metadata)
 
         if len(errors) == 0:
-            web.header('Content-Type', 'text/xml')
+            add_header('Content-Type', 'text/xml')
             return metadata
         else:
-            web.ctx.status = "500 Internal Server Error"
+            webdict().status = "500 Internal Server Error"
             return ', '.join(errors)
 
 

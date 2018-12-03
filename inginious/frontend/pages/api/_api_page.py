@@ -7,10 +7,9 @@
 
 import json
 
-import web
-
 import inginious.common.custom_yaml as yaml
 from inginious.frontend.pages.utils import INGIniousPage
+from inginious.frontend.web_utils import webdict, add_header, webenv, websafe
 
 
 class APIPage(INGIniousPage):
@@ -51,7 +50,7 @@ class APIPage(INGIniousPage):
         except APIError as error:
             return error.send()
 
-        web.ctx.status = _convert_http_status(status_code)
+        webdict().status = _convert_http_status(status_code)
         return _api_convert_output(return_value)
 
     def _guess_available_methods(self):
@@ -123,7 +122,7 @@ class APIError(Exception):
 
     def send(self):
         """ Send the API Exception to the client """
-        web.ctx.status = _convert_http_status(self.status_code)
+        webdict().status = _convert_http_status(self.status_code)
         return _api_convert_output(self.return_value)
 
 
@@ -135,7 +134,7 @@ class APIInvalidMethod(APIError):
         self.methods = methods
 
     def send(self):
-        web.header('Allow', ",".join(self.methods))
+        add_header('Allow', ",".join(self.methods))
         return APIError.send(self)
 
 
@@ -162,23 +161,23 @@ class APINotFound(APIError):
 
 def _api_convert_output(return_value):
     """ Convert the output to what the client asks """
-    content_type = web.ctx.environ.get('CONTENT_TYPE', 'text/json')
+    content_type = webenv().get('CONTENT_TYPE', 'text/json')
 
     if "text/json" in content_type:
-        web.header('Content-Type', 'text/json; charset=utf-8')
+        add_header('Content-Type', 'text/json; charset=utf-8')
         return json.dumps(return_value)
     if "text/html" in content_type:
-        web.header('Content-Type', 'text/html; charset=utf-8')
+        add_header('Content-Type', 'text/html; charset=utf-8')
         dump = yaml.dump(return_value)
-        return "<pre>" + web.websafe(dump) + "</pre>"
+        return "<pre>" + websafe(dump) + "</pre>"
     if "text/yaml" in content_type or \
                     "text/x-yaml" in content_type or \
                     "application/yaml" in content_type or \
                     "application/x-yaml" in content_type:
-        web.header('Content-Type', 'text/yaml; charset=utf-8')
+        add_header('Content-Type', 'text/yaml; charset=utf-8')
         dump = yaml.dump(return_value)
         return dump
-    web.header('Content-Type', 'text/json; charset=utf-8')
+    add_header('Content-Type', 'text/json; charset=utf-8')
     return json.dumps(return_value)
 
 

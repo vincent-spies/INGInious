@@ -3,13 +3,13 @@
 # This file is part of INGInious. See the LICENSE and the COPYRIGHTS files for
 # more information about the licensing of this file.
 
-import web
 import gettext
 import logging
 
 from bson.errors import InvalidId
 
 from inginious.frontend.pages.course_admin.utils import INGIniousAdminPage
+from inginious.frontend.web_utils import not_found_exception, webinput, see_other_exception
 
 
 class SubmissionPage(INGIniousAdminPage):
@@ -20,10 +20,10 @@ class SubmissionPage(INGIniousAdminPage):
         try:
             submission = self.submission_manager.get_submission(submissionid, False)
             if not submission:
-                raise web.notfound()
+                raise not_found_exception()
         except InvalidId as ex:
             self._logger.info("Invalid ObjectId : %s", submissionid)
-            raise web.notfound()
+            raise not_found_exception()
 
         courseid = submission["courseid"]
         taskid = submission["taskid"]
@@ -39,15 +39,15 @@ class SubmissionPage(INGIniousAdminPage):
         course, task, submission = self.fetch_submission(submissionid)
         is_admin = self.user_manager.has_admin_rights_on_course(course)
 
-        webinput = web.input()
-        if "replay" in webinput and is_admin:
+        wi = webinput()
+        if "replay" in wi and is_admin:
             self.submission_manager.replay_job(task, submission)
-        elif "replay-copy" in webinput:  # Authorized for tutors
+        elif "replay-copy" in wi:  # Authorized for tutors
             self.submission_manager.replay_job(task, submission, True)
-            web.seeother(self.app.get_homepath() + "/course/" + course.get_id() + "/" + task.get_id())
-        elif "replay-debug" in webinput and is_admin:
+            see_other_exception(self.app.get_homepath() + "/course/" + course.get_id() + "/" + task.get_id())
+        elif "replay-debug" in wi and is_admin:
             self.submission_manager.replay_job(task, submission, True, "ssh")
-            web.seeother(self.app.get_homepath() + "/course/" + course.get_id() + "/" + task.get_id())
+            see_other_exception(self.app.get_homepath() + "/course/" + course.get_id() + "/" + task.get_id())
 
         return self.page(course, task, submission)
 

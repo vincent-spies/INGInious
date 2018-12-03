@@ -8,11 +8,13 @@
 import json
 
 import web
+
 from bson.objectid import ObjectId
 from pymongo import ReturnDocument
 
 from inginious.common import custom_yaml
 from inginious.frontend.pages.course_admin.utils import INGIniousAdminPage
+from inginious.frontend.web_utils import not_found_exception, see_other_exception
 
 
 class CourseEditClassroom(INGIniousAdminPage):
@@ -119,7 +121,7 @@ class CourseEditClassroom(INGIniousAdminPage):
         """ Edit a classroom """
         course, __ = self.get_course_and_check_rights(courseid, allow_all_staff=True)
         if course.is_lti():
-            raise web.notfound()
+            raise not_found_exception()
 
         student_list, tutor_list, other_students, users_info = self.get_user_lists(course, classroomid)
         classroom = self.database.classrooms.find_one({"_id": ObjectId(classroomid), "courseid": courseid})
@@ -128,16 +130,17 @@ class CourseEditClassroom(INGIniousAdminPage):
             return self.template_helper.get_renderer().course_admin.edit_classroom(course, student_list, tutor_list, other_students, users_info,
                                                                                    classroom, "", False)
         else:
-            raise web.notfound()
+            raise not_found_exception()
 
     def POST_AUTH(self, courseid, classroomid):  # pylint: disable=arguments-differ
         """ Edit a classroom """
         course, __ = self.get_course_and_check_rights(courseid, allow_all_staff=True)
 
         if course.is_lti():
-            raise web.notfound()
+            raise not_found_exception()
 
         error = False
+        # TODO WEBPY
         data = web.input(tutors=[], groups=[], classroomfile={})
         if "delete" in data:
             # Get the classroom
@@ -156,7 +159,7 @@ class CourseEditClassroom(INGIniousAdminPage):
                                                              }})
 
                 self.database.classrooms.delete_one({"_id": ObjectId(classroomid)})
-                raise web.seeother(self.app.get_homepath() + "/admin/" + courseid + "/classrooms")
+                raise see_other_exception(self.app.get_homepath() + "/admin/" + courseid + "/classrooms")
         else:
             try:
                 if "upload" in data:

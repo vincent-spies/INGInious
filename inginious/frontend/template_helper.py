@@ -6,17 +6,19 @@
 """ TemplateManager """
 import os
 
-import web
 import inginious
 import json
+
+from inginious.frontend.web_utils import webdict, template
+
 
 class TemplateHelper(object):
     """ Class accessible from templates that calls function defined in the Python part of the code. """
 
-    # _WEB_CTX_KEY is the name of the key in web.ctx that stores entries made available to the whole
+    # _WEBDICT_KEY is the name of the key in webdict that stores entries made available to the whole
     # current thread. It allows to store javascript/css "addons" that will be displayed later when the
     # templates are rendered
-    _WEB_CTX_KEY = "inginious_tpl_helper"
+    _WEBDICT_KEY = "inginious_tpl_helper"
 
     def __init__(self, plugin_manager, user_manager, default_template_dir, default_layout, default_layout_lti, use_minified=True):
         """
@@ -91,7 +93,7 @@ class TemplateHelper(object):
         else:
             layout_path = None
 
-        return web.template.render(os.path.join(root_path, dir_path),
+        return template().render(os.path.join(root_path, dir_path),
                                    globals=self._template_globals,
                                    base=layout_path)
 
@@ -138,12 +140,12 @@ class TemplateHelper(object):
         return "\n".join(entries)
 
     def _get_ctx(self):
-        """ Get web.ctx object for the Template helper """
-        if self._WEB_CTX_KEY not in web.ctx:
-            web.ctx[self._WEB_CTX_KEY] = {
+        """ Get webdict() object for the Template helper """
+        if self._WEBDICT_KEY not in webdict():
+            webdict()[self._WEBDICT_KEY] = {
                 "javascript": {"footer": [], "header": []},
                 "css": []}
-        return web.ctx.get(self._WEB_CTX_KEY)
+        return webdict().get(self._WEBDICT_KEY)
 
     def _generic_hook(self, name, **kwargs):
         """ A generic hook that links the TemplateHelper with PluginManager """

@@ -6,10 +6,10 @@
 """ Profile page """
 import hashlib
 import re
-import web
 from pymongo import ReturnDocument
 
 from inginious.frontend.pages.utils import INGIniousAuthPage
+from inginious.frontend.web_utils import not_found_exception, webinput
 
 
 class ProfilePage(INGIniousAuthPage):
@@ -103,7 +103,7 @@ class ProfilePage(INGIniousAuthPage):
         userdata = self.database.users.find_one({"email": self.user_manager.session_email()})
 
         if not userdata:
-            raise web.notfound()
+            raise not_found_exception()
 
         return self.template_helper.get_renderer().preferences.profile("", False)
 
@@ -112,11 +112,11 @@ class ProfilePage(INGIniousAuthPage):
         userdata = self.database.users.find_one({"email": self.user_manager.session_email()})
 
         if not userdata:
-            raise web.notfound()
+            raise not_found_exception()
 
         msg = ""
         error = False
-        data = web.input()
+        data = webinput()
         if "save" in data:
             userdata, msg, error = self.save_profile(userdata, data)
 

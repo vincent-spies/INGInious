@@ -10,6 +10,7 @@ import web
 from bson.objectid import ObjectId
 
 from inginious.frontend.pages.course_admin.utils import INGIniousSubmissionAdminPage
+from inginious.frontend.web_utils import not_found_exception, add_header, webinput
 
 
 class CourseReplaySubmissions(INGIniousSubmissionAdminPage):
@@ -18,15 +19,16 @@ class CourseReplaySubmissions(INGIniousSubmissionAdminPage):
     def POST_AUTH(self, courseid):  # pylint: disable=arguments-differ
         """ GET request """
         course, __ = self.get_course_and_check_rights(courseid, allow_all_staff=False)
+        # TODO WEBPY
         user_input = web.input(tasks=[], aggregations=[], users=[])
 
         if "submission" in user_input:
             # Replay a unique submission
             submission = self.database.submissions.find_one({"_id": ObjectId(user_input.submission)})
             if submission is None:
-                raise web.notfound()
+                raise not_found_exception()
 
-            web.header('Content-Type', 'application/json')
+            add_header('Content-Type', 'application/json')
             self.submission_manager.replay_job(course.get_task(submission["taskid"]), submission)
             return json.dumps({"status": "waiting"})
         else:
@@ -45,12 +47,12 @@ class CourseReplaySubmissions(INGIniousSubmissionAdminPage):
                 for submission in submissions:
                     self.submission_manager.replay_job(tasks[submission["taskid"]], submission)
 
-            return self.show_page(course, web.input(), msg, error)
+            return self.show_page(course, webinput(), msg, error)
 
     def GET_AUTH(self, courseid):  # pylint: disable=arguments-differ
         """ GET request """
         course, __ = self.get_course_and_check_rights(courseid, allow_all_staff=False)
-        return self.show_page(course, web.input())
+        return self.show_page(course, webinput())
 
     def show_page(self, course, user_input, msg="", error=False):
         # Load task list

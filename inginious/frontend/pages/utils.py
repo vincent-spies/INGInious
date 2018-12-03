@@ -6,8 +6,6 @@
 """ Some utils for all the pages """
 import logging
 from typing import List
-
-import web
 import os
 from gridfs import GridFS
 
@@ -22,6 +20,8 @@ from pymongo.database import Database
 from inginious.common.course_factory import CourseFactory
 from inginious.common.task_factory import TaskFactory
 from inginious.frontend.lti_outcome_manager import LTIOutcomeManager
+from inginious.frontend.web_utils import not_acceptable_exception, see_other_exception, webinput, webenv, \
+    not_found_exception
 
 
 class INGIniousPage(object):
@@ -38,7 +38,8 @@ class INGIniousPage(object):
     @property
     def app(self):
         """ Returns the web application singleton """
-        return web.ctx.app_stack[0]
+        # TODO WEBPY still dependant on web.py
+        return webdict().app_stack[0]
 
     @property
     def plugin_manager(self) -> PluginManager:
@@ -127,10 +128,10 @@ class INGIniousAuthPage(INGIniousPage):
     """
 
     def POST_AUTH(self, *args, **kwargs):  # pylint: disable=unused-argument
-        raise web.notacceptable()
+        raise not_acceptable_exception()
 
     def GET_AUTH(self, *args, **kwargs):  # pylint: disable=unused-argument
-        raise web.notacceptable()
+        raise not_acceptable_exception()
 
     def GET(self, *args, **kwargs):
         """
@@ -139,7 +140,7 @@ class INGIniousAuthPage(INGIniousPage):
         """
         if self.user_manager.session_logged_in():
             if not self.user_manager.session_username() and not self.__class__.__name__ == "ProfilePage":
-                raise web.seeother("/preferences/profile")
+                raise see_other_exception("/preferences/profile")
 
             if not self.is_lti_page and self.user_manager.session_lti_info() is not None: #lti session
                 self.user_manager.disconnect_user()
@@ -156,7 +157,7 @@ class INGIniousAuthPage(INGIniousPage):
         """
         if self.user_manager.session_logged_in():
             if not self.user_manager.session_username() and not self.__class__.__name__ == "ProfilePage":
-                raise web.seeother("/preferences/profile")
+                raise see_other_exception("/preferences/profile")
 
             if not self.is_lti_page and self.user_manager.session_lti_info() is not None:  # lti session
                 self.user_manager.disconnect_user()
@@ -164,7 +165,7 @@ class INGIniousAuthPage(INGIniousPage):
 
             return self.POST_AUTH(*args, **kwargs)
         else:
-            user_input = web.input()
+            user_input = webinput()
             if "login" in user_input and "password" in user_input:
                 if self.user_manager.auth_user(user_input["login"].strip(), user_input["password"]) is not None:
                     return self.GET_AUTH(*args, **kwargs)
@@ -176,10 +177,10 @@ class INGIniousAuthPage(INGIniousPage):
 
 class SignInPage(INGIniousAuthPage):
     def GET_AUTH(self, *args, **kwargs):
-        raise web.seeother("/mycourses")
+        raise see_other_exception("/mycourses")
 
     def POST_AUTH(self, *args, **kwargs):
-        raise web.seeother("/mycourses")
+        raise see_other_exception("/mycourses")
 
     def GET(self):
         return INGIniousAuthPage.GET(self)
@@ -188,11 +189,11 @@ class SignInPage(INGIniousAuthPage):
 class LogOutPage(INGIniousAuthPage):
     def GET_AUTH(self, *args, **kwargs):
         self.user_manager.disconnect_user()
-        raise web.seeother(web.ctx.env.get('HTTP_REFERER', '/'))
+        raise see_other_exception(webenv().get('HTTP_REFERER', '/'))
 
     def POST_AUTH(self, *args, **kwargs):
         self.user_manager.disconnect_user()
-        raise web.seeother(web.ctx.env.get('HTTP_REFERER', '/'))
+        raise see_other_exception(webenv().get('HTTP_REFERER', '/'))
 
 
 class INGIniousStaticPage(INGIniousPage):
@@ -219,7 +220,7 @@ class INGIniousStaticPage(INGIniousPage):
                 mtime = os.stat(filepath).st_mtime
 
         if not filename:
-            raise web.notfound()
+            raise not_found_exception()
 
         # Check and update cache
         if INGIniousStaticPage.cache.get(filepath, (0, None))[0] < mtime:

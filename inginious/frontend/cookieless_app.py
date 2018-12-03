@@ -11,7 +11,9 @@ from web import utils
 import web
 from web.session import SessionExpired
 
+from inginious.frontend.web_utils import webdict, webinput
 
+# TODO WEBPY
 class CookieLessCompatibleApplication(web.application):
     def __init__(self, session_storage):
         """
@@ -72,7 +74,7 @@ class CookieLessCompatibleApplication(web.application):
         # load session
         if args[0] == "/@@":
             self._session.load('') # creates a new session
-            raise web.redirect("/@" + self._session.session_id + "@"+web.ctx.fullpath[3:]) # redirect to the same page, with the new
+            raise web.redirect("/@" + self._session.session_id + "@"+webdict().fullpath[3:]) # redirect to the same page, with the new
             # session id
         elif args[0] is None:
             self._session.load(None)
@@ -80,11 +82,11 @@ class CookieLessCompatibleApplication(web.application):
             self._session.load(args[0][2:len(args[0])-1])
 
         # Switch language if specified
-        input_data = web.input()
+        input_data = webinput()
         if "lang" in input_data:
             self._session.language = input_data["lang"]
         elif "language" not in self._session:
-            for lang in re.split("[,;]+", web.ctx.environ.get("HTTP_ACCEPT_LANGUAGE", "")):
+            for lang in re.split("[,;]+", webdict().environ.get("HTTP_ACCEPT_LANGUAGE", "")):
                 if lang in self._translations.keys():
                     self._session.language = lang
                     break
@@ -97,11 +99,11 @@ class CookieLessCompatibleApplication(web.application):
         :param force_cookieless: Force the cookieless session; the link will include the session_creator if needed.
         """
         if not ignore_session and self._session.get("session_id") is not None and self._session.get("cookieless", False):
-            return web.ctx.homepath + "/@" + self._session.get("session_id") + "@"
+            return webdict().homepath + "/@" + self._session.get("session_id") + "@"
         elif not ignore_session and force_cookieless:
-            return web.ctx.homepath + "/@@"
+            return webdict().homepath + "/@@"
         else:
-            return web.ctx.homepath
+            return webdict().homepath
 
 
 class CookieLessCompatibleSession(object):
@@ -195,7 +197,7 @@ class CookieLessCompatibleSession(object):
                 elif hasattr(self._initializer, '__call__'):
                     self._initializer()
 
-        self._data["ip"] = web.ctx.ip
+        self._data["ip"] = webdict().ip
 
     def _check_expiry(self):
         # check for expiry
@@ -207,7 +209,7 @@ class CookieLessCompatibleSession(object):
 
     def _validate_ip(self):
         # check for change of IP
-        if self._data["session_id"] and self.get('ip', None) != web.ctx.ip:
+        if self._data["session_id"] and self.get('ip', None) != webdict().ip:
             if not self._config.ignore_change_ip or self._data["cookieless"] is True:
                 return self.expired()
 
@@ -243,7 +245,7 @@ class CookieLessCompatibleSession(object):
             rand = os.urandom(16)
             now = time.time()
             secret_key = self._config.secret_key
-            session_id = hashlib.sha1(("%s%s%s%s" % (rand, now, utils.safestr(web.ctx.ip), secret_key)).encode("utf-8"))
+            session_id = hashlib.sha1(("%s%s%s%s" % (rand, now, utils.safestr(webdict().ip), secret_key)).encode("utf-8"))
             session_id = session_id.hexdigest()
             if session_id not in self.store:
                 break

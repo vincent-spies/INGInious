@@ -14,9 +14,9 @@ import random
 import zipfile
 
 import bson.json_util
-import web
 
 from inginious.frontend.pages.course_admin.utils import INGIniousAdminPage
+from inginious.frontend.web_utils import webinput, not_found_exception, add_header, see_other_exception
 
 
 class CourseDangerZonePage(INGIniousAdminPage):
@@ -110,16 +110,16 @@ class CourseDangerZonePage(INGIniousAdminPage):
         """ GET request """
         course, __ = self.get_course_and_check_rights(courseid, allow_all_staff=False)
 
-        data = web.input()
+        data = webinput()
 
         if "download" in data:
             filepath = os.path.join(self.backup_dir, courseid, data["download"] + '.zip')
 
             if not os.path.exists(os.path.dirname(filepath)):
-                raise web.notfound()
+                raise not_found_exception()
 
-            web.header('Content-Type', 'application/zip', unique=True)
-            web.header('Content-Disposition', 'attachment; filename="' + data["download"] + '.zip' + '"', unique=True)
+            add_header('Content-Type', 'application/zip', unique=True)
+            add_header('Content-Disposition', 'attachment; filename="' + data["download"] + '.zip' + '"', unique=True)
 
             return open(filepath, 'rb')
 
@@ -133,7 +133,7 @@ class CourseDangerZonePage(INGIniousAdminPage):
         msg = ""
         error = False
 
-        data = web.input()
+        data = webinput()
         if not data.get("token", "") == self.user_manager.session_token():
             msg = _("Operation aborted due to invalid token.")
             error = True
@@ -167,7 +167,7 @@ class CourseDangerZonePage(INGIniousAdminPage):
             else:
                 try:
                     self.delete_course(courseid)
-                    web.seeother(self.app.get_homepath() + '/index')
+                    see_other_exception(self.app.get_homepath() + '/index')
                 except:
                     msg = _("An error occurred while deleting the course data.")
                     error = True

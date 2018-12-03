@@ -6,9 +6,8 @@
 """ Index page """
 from collections import OrderedDict
 
-import web
-
 from inginious.frontend.pages.utils import INGIniousAuthPage
+from inginious.frontend.web_utils import webinput
 
 
 class MyCoursesPage(INGIniousAuthPage):
@@ -23,7 +22,7 @@ class MyCoursesPage(INGIniousAuthPage):
 
         username = self.user_manager.session_username()
         user_info = self.database.users.find_one({"username": username})
-        user_input = web.input()
+        user_input = webinput()
         success = None
 
         # Handle registration to a course

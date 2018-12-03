@@ -1,6 +1,7 @@
 # coding=utf-8
-import web
 from lti import ToolProvider
+
+from inginious.frontend.web_utils import webdict, webinput
 
 
 class LTIWebPyToolProvider(ToolProvider):
@@ -10,13 +11,13 @@ class LTIWebPyToolProvider(ToolProvider):
 
     @classmethod
     def from_webpy_request(cls, secret=None):
-        params = web.webapi.rawinput("POST")
-        headers = web.ctx.env.copy()
+        params = webinput("POST", True)
+        headers = webdict().env.copy()
 
         headers = dict([(k, headers[k])
                         for k in headers if
                         k.upper().startswith('HTTP_') or
                         k.upper().startswith('CONTENT_')])
 
-        url = web.ctx.home + web.ctx.fullpath
+        url = webdict().home + webdict().fullpath
         return cls.from_unpacked_request(secret, params, url, headers)

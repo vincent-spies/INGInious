@@ -4,6 +4,7 @@
 # more information about the licensing of this file.
 
 import pymongo
+# TODO webpy
 import web
 import re
 import itertools
@@ -15,6 +16,7 @@ from collections import OrderedDict
 from inginious.frontend.pages.course_admin.utils import make_csv, INGIniousAdminPage
 from inginious.frontend.pages.course_admin.statistics import compute_statistics
 from inginious.common.base import id_checker
+from inginious.frontend.web_utils import webinput, add_header, not_found_exception
 
 
 class CourseSubmissionsPage(INGIniousAdminPage):
@@ -31,9 +33,9 @@ class CourseSubmissionsPage(INGIniousAdminPage):
         course, __ = self.get_course_and_check_rights(courseid)
         msgs = []
 
-        if "replay" in web.input():
+        if "replay" in webinput():
             if not self.user_manager.has_admin_rights_on_course(course):
-                raise web.notfound()
+                raise not_found_exception()
             
             input = self.get_input()
             tasks = course.get_tasks()
@@ -70,13 +72,13 @@ class CourseSubmissionsPage(INGIniousAdminPage):
         if user_input.stat != "no_stat":
             statistics = compute_statistics(tasks, data, True if "with_pond_stat" == user_input.stat else False)
 
-        if "csv" in web.input():
+        if "csv" in webinput():
             return make_csv(data)
                         
-        if "download" in web.input():
+        if "download" in webinput():
             # self._logger.info("Downloading %d submissions from course %s", len(data), course.get_id())
-            web.header('Content-Type', 'application/x-gzip', unique=True)
-            web.header('Content-Disposition', 'attachment; filename="submissions.tgz"', unique=True)
+            add_header('Content-Type', 'application/x-gzip', unique=True)
+            add_header('Content-Disposition', 'attachment; filename="submissions.tgz"', unique=True)
 
             # Tweak if not using classrooms : classroom['students'] may content ungrouped users
             aggregations = dict([(username,
@@ -173,7 +175,7 @@ class CourseSubmissionsPage(INGIniousAdminPage):
             d["best"] = d["_id"] in best_submissions_list  # mark best submissions
 
         # Keep best submissions
-        if "eval" in user_input or ("eval_dl" in user_input and "download" in web.input()):
+        if "eval" in user_input or ("eval_dl" in user_input and "download" in webinput()):
             data = [d for d in data if d["best"]]
         return data, classroom
 
@@ -199,14 +201,14 @@ class CourseSubmissionsPage(INGIniousAdminPage):
         # Sanitise inputs
         for item in itertools.chain(user_input.task, user_input.aggregation):
             if not id_checker(item):
-                raise web.notfound()
+                raise not_found_exception()
 
         if user_input.sort_by not in self._allowed_sort:
-            raise web.notfound()
+            raise not_found_exception()
 
         digits = [user_input.grade_min, user_input.grade_max, user_input.order, user_input.limit]
         for d in digits:
             if d != '' and not d.isdigit():
-                raise web.notfound()
+                raise not_found_exception()
 
         return user_input 

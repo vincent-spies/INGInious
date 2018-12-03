@@ -13,6 +13,7 @@ from pymongo import ReturnDocument
 
 from inginious.common import custom_yaml
 from inginious.frontend.pages.course_admin.utils import INGIniousAdminPage
+from inginious.frontend.web_utils import not_found_exception, see_other_exception
 
 
 class CourseEditAggregation(INGIniousAdminPage):
@@ -142,12 +143,12 @@ class CourseEditAggregation(INGIniousAdminPage):
                                                                                        other_students, users_info,
                                                                                        aggregation, msg, error)
             else:
-                raise web.notfound()
+                raise not_found_exception()
         else:
             student_list, tutor_list, users_info = self.get_user_lists(course)
             aggregations = self.user_manager.get_course_aggregations(course)
             if course.use_classrooms():
-                raise web.notfound()
+                raise not_found_exception()
             else:
                 return self.template_helper.get_renderer().course_admin.teams_edit(course, student_list,
                                                                                         tutor_list,
@@ -159,7 +160,7 @@ class CourseEditAggregation(INGIniousAdminPage):
         course, __ = self.get_course_and_check_rights(courseid, allow_all_staff=True)
 
         if course.is_lti():
-            raise web.notfound()
+            raise not_found_exception()
 
         return self.display_page(course, aggregationid)
 
@@ -168,11 +169,12 @@ class CourseEditAggregation(INGIniousAdminPage):
         course, __ = self.get_course_and_check_rights(courseid, allow_all_staff=True)
 
         if course.is_lti():
-            raise web.notfound()
+            raise not_found_exception()
 
         msg=''
         error = False
         errored_students = []
+        # TODO WEBPY
         data = web.input(delete=[], tutors=[], groups=[], aggregationfile={})
         if len(data["delete"]):
 
@@ -196,7 +198,7 @@ class CourseEditAggregation(INGIniousAdminPage):
                     msg = _("Classroom updated.")
 
             if aggregationid and aggregationid in data["delete"]:
-                raise web.seeother(self.app.get_homepath() + "/admin/" + courseid + "/aggregations")
+                raise see_other_exception(self.app.get_homepath() + "/admin/" + courseid + "/aggregations")
 
         try:
             if "upload" in data:

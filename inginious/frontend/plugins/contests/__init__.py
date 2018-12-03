@@ -10,11 +10,11 @@ from collections import OrderedDict
 from datetime import datetime, timedelta
 
 import pymongo
-import web
 
 from inginious.frontend.accessible_time import AccessibleTime
 from inginious.frontend.pages.course_admin.utils import INGIniousAdminPage
 from inginious.frontend.pages.utils import INGIniousAuthPage
+from inginious.frontend.web_utils import webdict, not_found_exception, webinput
 
 
 def add_admin_menu(course): # pylint: disable=unused-argument
@@ -32,10 +32,10 @@ def task_accessibility(course, task, default): # pylint: disable=unused-argument
 
 def additional_headers():
     """ Additional HTML headers """
-    return '<link href="' + web.ctx.homepath \
+    return '<link href="' + webdict().homepath \
            + '/static/plugins/contests/scoreboard.css" rel="stylesheet">' \
-             '<script src="' + web.ctx.homepath + '/static/plugins/contests/jquery.countdown.min.js"></script>' \
-             '<script src="' + web.ctx.homepath + '/static/plugins/contests/contests.js"></script>'
+             '<script src="' + webdict().homepath + '/static/plugins/contests/jquery.countdown.min.js"></script>' \
+             '<script src="' + webdict().homepath + '/static/plugins/contests/contests.js"></script>'
 
 
 def get_contest_data(course):
@@ -67,7 +67,7 @@ class ContestScoreboard(INGIniousAuthPage):
         course = self.course_factory.get_course(courseid)
         contest_data = get_contest_data(course)
         if not contest_data['enabled']:
-            raise web.notfound()
+            raise not_found_exception()
         start = datetime.strptime(contest_data['start'], "%Y-%m-%d %H:%M:%S")
         end = datetime.strptime(contest_data['end'], "%Y-%m-%d %H:%M:%S")
         blackout = end - timedelta(hours=contest_data['blackout'])
@@ -171,7 +171,7 @@ class ContestAdmin(INGIniousAdminPage):
         course, __ = self.get_course_and_check_rights(courseid, allow_all_staff=False)
         contest_data = get_contest_data(course)
 
-        new_data = web.input()
+        new_data = webinput()
         errors = []
         try:
             contest_data['enabled'] = new_data.get('enabled', '0') == '1'

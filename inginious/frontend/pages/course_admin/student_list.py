@@ -5,9 +5,8 @@
 
 from collections import OrderedDict
 
-import web
-
 from inginious.frontend.pages.course_admin.utils import make_csv, INGIniousAdminPage
+from inginious.frontend.web_utils import webinput
 
 
 class CourseStudentListPage(INGIniousAdminPage):
@@ -21,7 +20,7 @@ class CourseStudentListPage(INGIniousAdminPage):
     def POST_AUTH(self, courseid):  # pylint: disable=arguments-differ
         """ POST request """
         course, __ = self.get_course_and_check_rights(courseid, None, False)
-        data = web.input()
+        data = webinput()
         if "remove" in data:
             try:
                 if data["type"] == "all":
@@ -63,7 +62,7 @@ class CourseStudentListPage(INGIniousAdminPage):
         for username, data in self.user_manager.get_course_caches(list(users.keys()), course).items():
             user_data[username].update(data if data is not None else {})
 
-        if "csv" in web.input():
+        if "csv" in webinput():
             return make_csv(user_data)
 
         return self.template_helper.get_renderer().course_admin.student_list(course, list(user_data.values()), error, post)

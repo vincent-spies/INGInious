@@ -6,7 +6,6 @@
 """ Manages users data and session """
 import logging
 import hashlib
-import web
 from abc import ABCMeta, abstractmethod
 from datetime import datetime
 from datetime import timedelta
@@ -16,6 +15,8 @@ from collections import OrderedDict
 import pymongo
 from binascii import hexlify
 import os
+
+from inginious.frontend.web_utils import get_client_ip, not_found_exception
 
 
 class AuthInvalidInputException(Exception):
@@ -287,7 +288,7 @@ class UserManager:
 
         self._database.users.update_one({"email": email}, {"$set": {"realname": realname, "username": username, "language": language}},
                                         upsert=True)
-        self._logger.info("User %s connected - %s - %s - %s", username, realname, email, web.ctx.ip)
+        self._logger.info("User %s connected - %s - %s - %s", username, realname, email, get_client_ip())
         self._set_session(username, realname, email, language)
         return True
 
@@ -297,7 +298,7 @@ class UserManager:
         :param ip_addr: the ip address of the client, that will be logged
         """
         if self.session_logged_in():
-            self._logger.info("User %s disconnected - %s - %s - %s", self.session_username(), self.session_realname(), self.session_email(), web.ctx.ip)
+            self._logger.info("User %s disconnected - %s - %s - %s", self.session_username(), self.session_realname(), self.session_email(), get_client_ip())
         self._destroy_session()
 
     def get_users_info(self, usernames):
@@ -366,7 +367,7 @@ class UserManager:
 
         auth_method = self.get_auth_method(auth_id)
         if not auth_method:
-            raise web.notfound()
+            raise not_found_exception()
 
         # Look for already bound auth method username
         user_profile = self._database.users.find_one({"bindings." + auth_id: username})

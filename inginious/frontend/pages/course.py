@@ -4,9 +4,9 @@
 # more information about the licensing of this file.
 
 """ Course page """
-import web
 
 from inginious.frontend.pages.utils import INGIniousAuthPage, INGIniousPage
+from inginious.frontend.web_utils import not_found_exception, webinput, see_other_exception
 
 
 class CoursePage(INGIniousPage):
@@ -17,7 +17,7 @@ class CoursePage(INGIniousPage):
         try:
             course = self.course_factory.get_course(courseid)
         except:
-            raise web.notfound()
+            raise not_found_exception()
 
         return course
 
@@ -25,10 +25,10 @@ class CoursePage(INGIniousPage):
         """ POST request """
         course = self.get_course(courseid)
 
-        user_input = web.input()
+        user_input = webinput()
         if "unregister" in user_input and course.allow_unregister():
             self.user_manager.course_unregister_user(course, self.user_manager.session_username())
-            raise web.seeother(self.app.get_homepath() + '/mycourses')
+            raise see_other_exception(self.app.get_homepath() + '/mycourses')
 
         return self.show_page(course)
 

@@ -7,11 +7,10 @@
 import json
 import re
 
-import web
-
 from inginious.client.client_buffer import ClientBuffer
 from inginious.client.client_sync import ClientSync
 from inginious.frontend.pages.utils import INGIniousPage
+from inginious.frontend.web_utils import add_header, webinput
 
 
 def init(plugin_manager, course_factory, client, config):
@@ -67,9 +66,9 @@ def init(plugin_manager, course_factory, client, config):
 
         def POST(self):
             """ POST request """
-            web.header('Access-Control-Allow-Origin', '*')
-            web.header('Content-Type', 'application/json')
-            post_input = web.input()
+            add_header('Access-Control-Allow-Origin', '*')
+            add_header('Content-Type', 'application/json')
+            post_input = webinput()
 
             if "input" in post_input and "taskid" in post_input:
                 # New job

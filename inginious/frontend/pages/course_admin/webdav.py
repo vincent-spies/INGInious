@@ -3,9 +3,8 @@
 # This file is part of INGInious. See the LICENSE and the COPYRIGHTS files for
 # more information about the licensing of this file.
 
-import web
-
 from inginious.frontend.pages.course_admin.utils import INGIniousAdminPage
+from inginious.frontend.web_utils import not_found_exception
 
 
 class WebDavInfoPage(INGIniousAdminPage):
@@ -19,7 +18,7 @@ class WebDavInfoPage(INGIniousAdminPage):
     def page(self, course):
         """ Get all data and display the page """
         if not self.webdav_host:
-            raise web.notfound()
+            raise not_found_exception()
 
         url = self.webdav_host + "/" + course.get_id()
         username = self.user_manager.session_username()

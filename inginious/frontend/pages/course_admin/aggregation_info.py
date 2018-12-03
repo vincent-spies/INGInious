@@ -3,11 +3,10 @@
 # This file is part of INGInious. See the LICENSE and the COPYRIGHTS files for
 # more information about the licensing of this file.
 
-
-import web
 from bson.objectid import ObjectId
 
 from inginious.frontend.pages.course_admin.utils import make_csv, INGIniousAdminPage
+from inginious.frontend.web_utils import not_found_exception, webinput
 
 
 class CourseAggregationInfoPage(INGIniousAdminPage):
@@ -18,7 +17,7 @@ class CourseAggregationInfoPage(INGIniousAdminPage):
         course, __ = self.get_course_and_check_rights(courseid)
 
         if course.is_lti():
-            raise web.notfound()
+            raise not_found_exception()
 
         return self.page(course, aggregationid)
 
@@ -65,7 +64,7 @@ class CourseAggregationInfoPage(INGIniousAdminPage):
                     result[taskdata["_id"]]["status"] = "failed"
                 result[taskdata["_id"]]["grade"] = taskdata["grade"]
 
-        if "csv" in web.input():
+        if "csv" in webinput():
             return make_csv(result)
 
         results = sorted(list(result.values()), key=lambda result: (tasks[result["taskid"]].get_order(), result["taskid"]))

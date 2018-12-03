@@ -1,12 +1,12 @@
 # coding=utf-8
 
-import web
 from inginious.frontend.lti_request_validator import LTIValidator
 from inginious.frontend.pages.utils import INGIniousPage, INGIniousAuthPage
 
 from inginious.common import exceptions
 from inginious.frontend.lti_tool_provider import LTIWebPyToolProvider
 from inginious.frontend.pages.tasks import BaseTaskPage
+from inginious.frontend.web_utils import not_found_exception, webinput, see_other_exception, forbidden_exception
 
 
 class LTITaskPage(INGIniousAuthPage):
@@ -16,7 +16,7 @@ class LTITaskPage(INGIniousAuthPage):
     def GET_AUTH(self):
         data = self.user_manager.session_lti_info()
         if data is None:
-            raise web.notfound()
+            raise not_found_exception()
         (courseid, taskid) = data['task']
 
         return BaseTaskPage(self).GET(courseid, taskid, True)
@@ -24,7 +24,7 @@ class LTITaskPage(INGIniousAuthPage):
     def POST_AUTH(self):
         data = self.user_manager.session_lti_info()
         if data is None:
-            raise web.notfound()
+            raise not_found_exception()
         (courseid, taskid) = data['task']
 
         return BaseTaskPage(self).POST(courseid, taskid, True)
@@ -41,7 +41,7 @@ class LTIBindPage(INGIniousAuthPage):
         return cookieless_session, data
 
     def GET_AUTH(self):
-        input_data = web.input()
+        input_data = webinput()
         if "sessionid" not in input_data:
             return self.template_helper.get_renderer().lti_bind(False, "", None, _("Missing LTI session id"))
 
@@ -53,7 +53,7 @@ class LTIBindPage(INGIniousAuthPage):
         return self.template_helper.get_renderer().lti_bind(False, cookieless_session["session_id"], data, "")
 
     def POST_AUTH(self):
-        input_data = web.input()
+        input_data = webinput()
         if "sessionid" not in input_data:
             return self.template_helper.get_renderer().lti_bind(False, "", None, _("Missing LTI session id"))
 
@@ -103,7 +103,7 @@ class LTILoginPage(INGIniousPage):
         """
         data = self.user_manager.session_lti_info()
         if data is None:
-            raise web.notfound()
+            raise not_found_exception()
 
         try:
             course = self.course_factory.get_course(data["task"][0])
@@ -117,7 +117,7 @@ class LTILoginPage(INGIniousPage):
             self.user_manager.connect_user(user_profile["username"], user_profile["realname"], user_profile["email"], user_profile["language"])
 
         if self.user_manager.session_logged_in():
-            raise web.seeother(self.app.get_homepath() + "/lti/task")
+            raise see_other_exception(self.app.get_homepath() + "/lti/task")
 
         return self.template_helper.get_renderer().lti_login(False)
 
@@ -138,19 +138,19 @@ class LTILaunchPage(INGIniousPage):
         (sessionid, loggedin) = self._parse_lti_data(courseid, taskid)
 
         if loggedin:
-            raise web.seeother(self.app.get_homepath() + "/lti/task")
+            raise see_other_exception(self.app.get_homepath() + "/lti/task")
         else:
-            raise web.seeother(self.app.get_homepath() + "/lti/login")
+            raise see_other_exception(self.app.get_homepath() + "/lti/login")
 
     def _parse_lti_data(self, courseid, taskid):
         """ Verify and parse the data for the LTI basic launch """
-        post_input = web.webapi.rawinput("POST")
+        post_input = webinput("POST", True)
         self.logger.debug('_parse_lti_data:' + str(post_input))
 
         try:
             course = self.course_factory.get_course(courseid)
         except exceptions.CourseNotFoundException as ex:
-            raise web.notfound(str(ex))
+            raise not_found_exception(str(ex))
 
         try:
             test = LTIWebPyToolProvider.from_webpy_request()
@@ -159,7 +159,7 @@ class LTILaunchPage(INGIniousPage):
         except Exception:
             self.logger.exception("...")
             self.logger.info("Error while validating LTI request for %s", str(post_input))
-            raise web.forbidden(_("Error while validating LTI request"))
+            raise forbidden_exception(_("Error while validating LTI request"))
 
         if verified:
             self.logger.debug('parse_lit_data for %s', str(post_input))
@@ -174,7 +174,7 @@ class LTILaunchPage(INGIniousPage):
             if course.lti_send_back_grade():
                 if lis_outcome_service_url is None or outcome_result_id is None:
                     self.logger.info('Error: lis_outcome_service_url is None but lti_send_back_grade is True')
-                    raise web.forbidden(_("In order to send grade back to the TC, INGInious needs the parameters lis_outcome_service_url and "
+                    raise forbidden_exception(_("In order to send grade back to the TC, INGInious needs the parameters lis_outcome_service_url and "
                                         "lis_outcome_result_id in the LTI basic-launch-request. Please contact your administrator."))
             else:
                 lis_outcome_service_url = None
@@ -194,7 +194,7 @@ class LTILaunchPage(INGIniousPage):
             return session_id, loggedin
         else:
             self.logger.info("Couldn't validate LTI request")
-            raise web.forbidden(_("Couldn't validate LTI request"))
+            raise forbidden_exception(_("Couldn't validate LTI request"))
 
     def _find_realname(self, post_input):
         """ Returns the most appropriate name to identify the user """

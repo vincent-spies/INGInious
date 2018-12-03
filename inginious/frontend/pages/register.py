@@ -9,9 +9,9 @@ import hashlib
 import random
 import re
 
-import web
-
+from inginious.frontend.mail_utils import get_smtp_sendername, sendmail
 from inginious.frontend.pages.utils import INGIniousPage
+from inginious.frontend.web_utils import not_found_exception, webinput, webdict
 
 
 class RegistrationPage(INGIniousPage):
@@ -20,12 +20,12 @@ class RegistrationPage(INGIniousPage):
     def GET(self):
         """ Handles GET request """
         if self.user_manager.session_logged_in() or not self.app.allow_registration:
-            raise web.notfound()
+            raise not_found_exception()
 
         error = False
         reset = None
         msg = ""
-        data = web.input()
+        data = webinput()
 
         if "activate" in data:
             msg, error = self.activate_user(data)
@@ -103,12 +103,12 @@ class RegistrationPage(INGIniousPage):
                                             "bindings": {},
                                             "language": self.user_manager._session.get("language", "en")})
                 try:
-                    web.sendmail(web.config.smtp_sendername, data["email"], _("Welcome on INGInious"),
+                    sendmail(get_smtp_sendername(), data["email"], _("Welcome on INGInious"),
                                  _("""Welcome on INGInious !
 
 To activate your account, please click on the following link :
 """)
-                                 + web.ctx.home + "/register?activate=" + activate_hash)
+                                 + webdict().home + "/register?activate=" + activate_hash)
                     msg = _("You are succesfully registered. An email has been sent to you for activation.")
                 except:
                     error = True
@@ -138,11 +138,11 @@ To activate your account, please click on the following link :
                 msg = _("This email address was not found in database.")
             else:
                 try:
-                    web.sendmail(web.config.smtp_sendername, data["recovery_email"], _("INGInious password recovery"),
+                    sendmail(get_smtp_sendername(), data["recovery_email"], _("INGInious password recovery"),
                                  _("""Dear {realname},
 
 Someone (probably you) asked to reset your INGInious password. If this was you, please click on the following link :
-""").format(realname=user["realname"]) + web.ctx.home + "/register?reset=" + reset_hash)
+""").format(realname=user["realname"]) + webdict().home + "/register?reset=" + reset_hash)
                     msg = _("An email has been sent to you to reset your password.")
                 except:
                     error = True
@@ -179,12 +179,12 @@ Someone (probably you) asked to reset your INGInious password. If this was you, 
     def POST(self):
         """ Handles POST request """
         if self.user_manager.session_logged_in() or not self.app.allow_registration:
-            raise web.notfound()
+            raise not_found_exception()
 
         reset = None
         msg = ""
         error = False
-        data = web.input()
+        data = webinput()
         if "register" in data:
             msg, error = self.register_user(data)
         elif "lostpasswd" in data:

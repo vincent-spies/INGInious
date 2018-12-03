@@ -5,11 +5,11 @@
 
 from collections import OrderedDict
 
-import web
 from bson.objectid import ObjectId
 
 import inginious.common.custom_yaml as yaml
 from inginious.frontend.pages.course_admin.utils import make_csv, INGIniousAdminPage
+from inginious.frontend.web_utils import webinput, not_found_exception, add_header
 
 
 class CourseAggregationListPage(INGIniousAdminPage):
@@ -20,11 +20,11 @@ class CourseAggregationListPage(INGIniousAdminPage):
         course, __ = self.get_course_and_check_rights(courseid)
 
         if course.is_lti():
-            raise web.notfound()
+            raise not_found_exception()
 
-        if "download" in web.input():
-            web.header('Content-Type', 'text/x-yaml', unique=True)
-            web.header('Content-Disposition', 'attachment; filename="aggregations.yaml"', unique=True)
+        if "download" in webinput():
+            add_header('Content-Type', 'text/x-yaml', unique=True)
+            add_header('Content-Disposition', 'attachment; filename="aggregations.yaml"', unique=True)
             if course.use_classrooms():
                 aggregations = [{"default": aggregation["default"],
                                "description": aggregation["description"],
@@ -49,12 +49,12 @@ class CourseAggregationListPage(INGIniousAdminPage):
         course, __ = self.get_course_and_check_rights(courseid)
 
         if course.is_lti():
-            raise web.notfound()
+            raise not_found_exception()
 
         error = False
         try:
             if self.user_manager.has_admin_rights_on_course(course):
-                data = web.input()
+                data = webinput()
                 if 'classroom' in data:
                     default = True if self.database.aggregations.find_one({"courseid": courseid, "default": True}) is None else False
                     self.database.aggregations.insert({"default": default, "courseid": courseid, "students": [],
@@ -126,7 +126,7 @@ class CourseAggregationListPage(INGIniousAdminPage):
             else:
                 other_aggregations.append(aggregation)
 
-        if "csv" in web.input():
+        if "csv" in webinput():
             return make_csv(data)
 
         return self.template_helper.get_renderer().course_admin.aggregation_list(course, [my_aggregations, other_aggregations], msg, error)

@@ -8,11 +8,11 @@
 import json
 import os
 
-import web
 from requests_oauthlib import OAuth2Session
 from requests_oauthlib.compliance_fixes import linkedin_compliance_fix
 
 from inginious.frontend.user_manager import AuthMethod
+from inginious.frontend.web_utils import webdict
 
 authorization_base_url = 'https://www.linkedin.com/uas/oauth2/authorization'
 token_url = 'https://www.linkedin.com/uas/oauth2/accessToken'
@@ -24,17 +24,17 @@ class LinkedInAuthMethod(AuthMethod):
     LinkedIn auth method
     """
     def get_auth_link(self, auth_storage, share=False):
-        linkedin = OAuth2Session(self._client_id, scope=scope + (["w_share"] if share else []), redirect_uri=web.ctx.home + self._callback_page)
+        linkedin = OAuth2Session(self._client_id, scope=scope + (["w_share"] if share else []), redirect_uri=webdict().home + self._callback_page)
         linkedin = linkedin_compliance_fix(linkedin)
         authorization_url, state = linkedin.authorization_url(authorization_base_url)
         auth_storage["oauth_state"] = state
         return authorization_url
 
     def callback(self, auth_storage):
-        linkedin = OAuth2Session(self._client_id, state=auth_storage["oauth_state"], redirect_uri=web.ctx.home + self._callback_page)
+        linkedin = OAuth2Session(self._client_id, state=auth_storage["oauth_state"], redirect_uri=webdict().home + self._callback_page)
         try:
             linkedin.fetch_token(token_url, client_secret=self._client_secret,
-                                 authorization_response=web.ctx.home + web.ctx.fullpath)
+                                 authorization_response=webdict().home + webdict().fullpath)
             r = linkedin.get('https://api.linkedin.com/v1/people/~:(id,first-name,last-name,email-address)?format=json')
             profile = json.loads(r.content.decode('utf-8'))
             auth_storage["session"] = linkedin
@@ -64,7 +64,7 @@ class LinkedInAuthMethod(AuthMethod):
                                              task=task.get_name(language),
                                              score=submission["grade"]
                                          ),
-                                         "submitted-url": web.ctx.home + "/course/" + course.get_id() + "/" + task.get_id(),
+                                         "submitted-url": webdict().home + "/course/" + course.get_id() + "/" + task.get_id(),
                                          "submitted-image-url": "http://www.inginious.org/assets/img/header.png"},
                                      "visibility": {
                                          "code": "anyone"

@@ -4,9 +4,8 @@
 # more information about the licensing of this file.
 
 """ Auth bindings page """
-import web
-
 from inginious.frontend.pages.utils import INGIniousAuthPage
+from inginious.frontend.web_utils import not_found_exception, webinput, see_other_exception
 
 
 class BindingsPage(INGIniousAuthPage):
@@ -27,9 +26,9 @@ class BindingsPage(INGIniousAuthPage):
         user_data = self.database.users.find_one({"username": self.user_manager.session_username()})
 
         if not user_data:
-            raise web.notfound()
+            raise not_found_exception()
 
-        user_input = web.input()
+        user_input = webinput()
         auth_methods = self.user_manager.get_auth_methods()
 
         if "auth_binding" in user_input:
@@ -39,7 +38,7 @@ class BindingsPage(INGIniousAuthPage):
                 error = True
                 msg = _("Incorrect authentication binding.")
             elif auth_binding not in user_data.get("bindings", {}):
-                raise web.seeother("/auth/signin/" + auth_binding)
+                raise see_other_exception("/auth/signin/" + auth_binding)
         elif "revoke_auth_binding" in user_input:
             auth_id = user_input["revoke_auth_binding"]
 

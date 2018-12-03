@@ -3,10 +3,8 @@
 # This file is part of INGInious. See the LICENSE and the COPYRIGHTS files for
 # more information about the licensing of this file.
 
-
-import web
-
 from inginious.frontend.pages.course_admin.utils import make_csv, INGIniousAdminPage
+from inginious.frontend.web_utils import webinput
 
 
 class CourseStudentInfoPage(INGIniousAdminPage):
@@ -42,7 +40,7 @@ class CourseStudentInfoPage(INGIniousAdminPage):
                 result[taskdata["taskid"]]["grade"] = taskdata["grade"]
                 result[taskdata["taskid"]]["submissionid"] = str(taskdata["submissionid"])
 
-        if "csv" in web.input():
+        if "csv" in webinput():
             return make_csv(result)
 
         results = sorted(list(result.values()), key=lambda result: (tasks[result["taskid"]].get_order(), result["taskid"]))

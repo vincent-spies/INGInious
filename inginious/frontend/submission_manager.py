@@ -15,12 +15,12 @@ from datetime import datetime
 
 import bson
 import pymongo
-import web
 from bson.objectid import ObjectId
 from pymongo.collection import ReturnDocument
 
 import inginious.common.custom_yaml
 from inginious.frontend.parsable_text import ParsableText
+from inginious.frontend.web_utils import get_client_ip
 
 
 class WebAppSubmissionManager:
@@ -277,7 +277,7 @@ class WebAppSubmissionManager:
 
         self._logger.info("New submission from %s - %s - %s/%s - %s", self._user_manager.session_username(),
                           self._user_manager.session_email(), task.get_course_id(), task.get_id(),
-                          web.ctx['ip'])
+                          get_client_ip())
 
         return submissionid, to_remove
 

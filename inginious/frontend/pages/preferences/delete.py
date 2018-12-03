@@ -4,9 +4,8 @@
 # more information about the licensing of this file.
 
 """ Profile page """
-import web
-
 from inginious.frontend.pages.utils import INGIniousAuthPage
+from inginious.frontend.web_utils import see_other_exception, not_found_exception, webinput
 
 
 class DeletePage(INGIniousAuthPage):
@@ -36,7 +35,7 @@ class DeletePage(INGIniousAuthPage):
                     self.user_manager.course_unregister_user(course, username)
 
             self.user_manager.disconnect_user()
-            raise web.seeother("/index")
+            raise see_other_exception("/index")
 
         return msg, error
 
@@ -45,7 +44,7 @@ class DeletePage(INGIniousAuthPage):
         userdata = self.database.users.find_one({"username": self.user_manager.session_username()})
 
         if not userdata or not self.app.allow_deletion:
-            raise web.notfound()
+            raise not_found_exception()
 
         return self.template_helper.get_renderer().preferences.delete("", False)
 
@@ -54,11 +53,11 @@ class DeletePage(INGIniousAuthPage):
         userdata = self.database.users.find_one({"username": self.user_manager.session_username()})
 
         if not userdata or not self.app.allow_deletion:
-            raise web.notfound()
+            raise not_found_exception()
 
         msg = ""
         error = False
-        data = web.input()
+        data = webinput()
         if "delete" in data:
             msg, error = self.delete_account(data)
 

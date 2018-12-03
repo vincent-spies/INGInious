@@ -8,6 +8,7 @@ from collections import OrderedDict
 import web
 
 from inginious.frontend.pages.course_admin.utils import make_csv, INGIniousAdminPage
+from inginious.frontend.web_utils import webinput
 
 
 class CourseTaskListPage(INGIniousAdminPage):
@@ -21,6 +22,7 @@ class CourseTaskListPage(INGIniousAdminPage):
     def POST_AUTH(self, courseid):  # pylint: disable=arguments-differ
         """ POST request """
         course, __ = self.get_course_and_check_rights(courseid)
+        # TODO webpy
         data = web.input(task=[])
 
         if "task" in data:
@@ -84,6 +86,6 @@ class CourseTaskListPage(INGIniousAdminPage):
                 result[entry["_id"]]["attempted"] = entry["attempted"]
                 result[entry["_id"]]["attempts"] = entry["attempts"]
                 result[entry["_id"]]["succeeded"] = entry["succeeded"]
-        if "csv" in web.input():
+        if "csv" in webinput():
             return make_csv(result)
         return self.template_helper.get_renderer().course_admin.task_list(course, result, errors)

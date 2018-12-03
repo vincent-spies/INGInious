@@ -8,8 +8,9 @@ import builtins
 import pymongo
 
 import inginious.frontend.pages.course_admin.utils as course_admin_utils
-import web
 from inginious.frontend.fix_webpy_cookies import fix_webpy_cookies
+from inginious.frontend.mail_utils import config_mail
+from inginious.frontend.web_utils import not_found_exception
 
 fix_webpy_cookies() # TODO: remove me once https://github.com/webpy/webpy/pull/419 is merge in web.py
 
@@ -25,6 +26,7 @@ from inginious.frontend.tasks import WebAppTask
 from inginious.frontend.template_helper import TemplateHelper
 from inginious.frontend.user_manager import UserManager
 from pymongo import MongoClient
+# TODO WEBPY
 from web.debugerror import debugerror
 
 import inginious.frontend.pages.preferences.utils as preferences_utils
@@ -210,12 +212,8 @@ def get_app(config):
     # Init web mail
     smtp_conf = config.get('smtp', None)
     if smtp_conf is not None:
-        web.config.smtp_server = smtp_conf["host"]
-        web.config.smtp_port = int(smtp_conf["port"])
-        web.config.smtp_starttls = bool(smtp_conf.get("starttls", False))
-        web.config.smtp_username = smtp_conf.get("username", "")
-        web.config.smtp_password = smtp_conf.get("password", "")
-        web.config.smtp_sendername = smtp_conf.get("sendername", "no-reply@ingnious.org")
+        config_mail(smtp_conf["host"], int(smtp_conf["port"]), bool(smtp_conf.get("starttls", False)),
+                    smtp_conf.get("username", ""), smtp_conf.get("password", ""), smtp_conf.get("sendername", "no-reply@ingnious.org"))
 
     # Add some helpers for the templates
     template_helper.add_to_template_globals("_", _)
@@ -234,7 +232,7 @@ def get_app(config):
                                                                                  plugin_manager, user_manager))
 
     # Not found page
-    appli.notfound = lambda: web.notfound(template_helper.get_renderer().notfound('Page not found'))
+    appli.notfound = lambda: not_found_exception(template_helper.get_renderer().notfound('Page not found'))
 
     # Enable stacktrace display if logging is at level DEBUG
     if config.get('log_level', 'INFO') == 'DEBUG':

@@ -5,9 +5,8 @@
 
 from collections import OrderedDict
 
-import web
-
 from inginious.frontend.pages.course_admin.utils import make_csv, INGIniousAdminPage
+from inginious.frontend.web_utils import webinput
 
 
 class CourseTaskInfoPage(INGIniousAdminPage):
@@ -96,9 +95,9 @@ class CourseTaskInfoPage(INGIniousAdminPage):
             else:
                 other_aggregations.append(aggregation)
 
-        if "csv" in web.input() and web.input()["csv"] == "students":
+        if "csv" in webinput() and webinput()["csv"] == "students":
             return make_csv(list(individual_data.values()))
-        elif "csv" in web.input() and web.input()["csv"] == "aggregations":
+        elif "csv" in webinput() and webinput()["csv"] == "aggregations":
             return make_csv(list(aggregation_data.values()))
 
         return self.template_helper.get_renderer().course_admin.task_info(course, task, individual_data.values(), [my_aggregations, other_aggregations])

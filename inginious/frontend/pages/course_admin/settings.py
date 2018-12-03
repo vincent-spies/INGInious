@@ -5,10 +5,9 @@
 
 import re
 
-import web
-
 from inginious.frontend.accessible_time import AccessibleTime
 from inginious.frontend.pages.course_admin.utils import INGIniousAdminPage
+from inginious.frontend.web_utils import webinput
 
 
 class CourseSettings(INGIniousAdminPage):
@@ -26,7 +25,7 @@ class CourseSettings(INGIniousAdminPage):
         errors = []
         course_content = {}
         try:
-            data = web.input()
+            data = webinput()
             course_content = self.course_factory.get_course_descriptor_content(courseid)
             course_content['name'] = data['name']
             if course_content['name'] == "":

@@ -22,6 +22,7 @@ import inginious.common.custom_yaml
 from inginious.common.base import id_checker
 from inginious.frontend.pages.course_admin.task_edit_file import CourseTaskFiles
 from inginious.frontend.tasks import WebAppTask
+from inginious.frontend.web_utils import see_other_exception
 
 
 class CourseEditTask(INGIniousAdminPage):
@@ -135,6 +136,7 @@ class CourseEditTask(INGIniousAdminPage):
             raise Exception("Invalid course/task id")
 
         course, __ = self.get_course_and_check_rights(courseid, allow_all_staff=False)
+        # TODO webpy
         data = web.input(task_file={})
 
         # Delete task ?
@@ -142,7 +144,7 @@ class CourseEditTask(INGIniousAdminPage):
             self.task_factory.delete_task(courseid, taskid)
             if data.get("wipe", False):
                 self.wipe_task(courseid, taskid)
-            raise web.seeother(self.app.get_homepath() + "/admin/"+courseid+"/tasks")
+            raise see_other_exception(self.app.get_homepath() + "/admin/"+courseid+"/tasks")
 
         # Else, parse content
         try:

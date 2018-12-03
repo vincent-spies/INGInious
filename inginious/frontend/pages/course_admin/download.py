@@ -9,6 +9,7 @@ import web
 from bson.objectid import ObjectId
 
 from inginious.frontend.pages.course_admin.utils import INGIniousSubmissionAdminPage
+from inginious.frontend.web_utils import not_found_exception, add_header, webinput
 
 
 class CourseDownloadSubmissions(INGIniousSubmissionAdminPage):
@@ -29,29 +30,30 @@ class CourseDownloadSubmissions(INGIniousSubmissionAdminPage):
         """ GET request """
         course, __ = self.get_course_and_check_rights(courseid)
 
+        # TODO WEBPY
         user_input = web.input(tasks=[], aggregations=[], users=[])
 
         if "filter_type" not in user_input or "type" not in user_input or "format" not in user_input or user_input.format not in self.valid_formats():
-            raise web.notfound()
+            raise not_found_exception()
 
         tasks = list(course.get_tasks().keys())
         for i in user_input.tasks:
             if i not in tasks:
-                raise web.notfound()
+                raise not_found_exception()
 
         # Load submissions
         submissions, aggregations = self.get_selected_submissions(course, user_input.filter_type, user_input.tasks,
                                                     user_input.users, user_input.aggregations, user_input.type)
 
         self._logger.info("Downloading %d submissions from course %s", len(submissions), courseid)
-        web.header('Content-Type', 'application/x-gzip', unique=True)
-        web.header('Content-Disposition', 'attachment; filename="submissions.tgz"', unique=True)
+        add_header('Content-Type', 'application/x-gzip', unique=True)
+        add_header('Content-Disposition', 'attachment; filename="submissions.tgz"', unique=True)
         return self.submission_manager.get_submission_archive(submissions, list(reversed(user_input.format.split('/'))), aggregations)
 
     def GET_AUTH(self, courseid):  # pylint: disable=arguments-differ
         """ GET request """
         course, __ = self.get_course_and_check_rights(courseid)
-        user_input = web.input()
+        user_input = webinput()
 
         # First, check for a particular submission
         if "submission" in user_input:
@@ -59,12 +61,12 @@ class CourseDownloadSubmissions(INGIniousSubmissionAdminPage):
                                                              "courseid": course.get_id(),
                                                              "status": {"$in": ["done", "error"]}})
             if submission is None:
-                raise web.notfound()
+                raise not_found_exception()
 
             self._logger.info("Downloading submission %s - %s - %s - %s", submission['_id'], submission['courseid'],
                               submission['taskid'], submission['username'])
-            web.header('Content-Type', 'application/x-gzip', unique=True)
-            web.header('Content-Disposition', 'attachment; filename="submissions.tgz"', unique=True)
+            add_header('Content-Type', 'application/x-gzip', unique=True)
+            add_header('Content-Disposition', 'attachment; filename="submissions.tgz"', unique=True)
             return self.submission_manager.get_submission_archive([submission], [], {})
 
         # Else, display the complete page

@@ -3,10 +3,8 @@
 # This file is part of INGInious. See the LICENSE and the COPYRIGHTS files for
 # more information about the licensing of this file.
 
-
-import web
-
 from inginious.frontend.pages.utils import INGIniousAuthPage
+from inginious.frontend.web_utils import see_other_exception
 
 
 def get_menu(app, current, renderer, plugin_manager, user_manager):
@@ -30,7 +28,7 @@ class RedirectPage(INGIniousAuthPage):
     def GET_AUTH(self):  # pylint: disable=arguments-differ
         """ GET request """
 
-        raise web.seeother('/preferences/profile')
+        raise see_other_exception('/preferences/profile')
 
     def POST_AUTH(self, courseid):  # pylint: disable=arguments-differ
         """ POST request """

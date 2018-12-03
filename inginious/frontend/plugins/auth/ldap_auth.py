@@ -8,10 +8,10 @@
 import logging
 
 import ldap3
-import web
 
 from inginious.frontend.pages.social import AuthenticationPage
 from inginious.frontend.user_manager import AuthMethod
+from inginious.frontend.web_utils import webinput, see_other_exception
 
 logger = logging.getLogger('inginious.webapp.plugin.auth.ldap')
 
@@ -66,7 +66,7 @@ class LDAPAuthenticationPage(AuthenticationPage):
     def POST(self, id):
         # Get configuration
         settings = self.user_manager.get_auth_method(id).get_settings()
-        login_data = web.input()
+        login_data = webinput()
         login = login_data["login"].strip().lower()
         password = login_data["password"]
 
@@ -116,7 +116,7 @@ class LDAPAuthenticationPage(AuthenticationPage):
             self.user_manager.bind_user(id, (username, realname, email))
             
             auth_storage = self.user_manager.session_auth_storage().setdefault(id, {})
-            raise web.seeother(auth_storage.get("redir_url", "/"))
+            raise see_other_exception(auth_storage.get("redir_url", "/"))
         else:
             logger.debug('Auth Failed')
             conn.unbind()

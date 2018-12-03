@@ -15,6 +15,7 @@ from bson.objectid import ObjectId
 
 from inginious.common.base import id_checker
 from inginious.frontend.pages.utils import INGIniousAuthPage
+from inginious.frontend.web_utils import add_header, see_other_exception
 
 
 class INGIniousAdminPage(INGIniousAuthPage):
@@ -24,7 +25,7 @@ class INGIniousAdminPage(INGIniousAuthPage):
 
     def get_course_and_check_rights(self, courseid, taskid=None, allow_all_staff=True):
         """ Returns the course with id ``courseid`` and the task with id ``taskid``, and verify the rights of the user.
-            Raise web.notfound() when there is no such course of if the users has not enough rights.
+            Raise not_found_exception() when there is no such course of if the users has not enough rights.
 
             :param courseid: the course on which to check rights
             :param taskid: If not None, returns also the task with id ``taskid``
@@ -36,17 +37,17 @@ class INGIniousAdminPage(INGIniousAuthPage):
             course = self.course_factory.get_course(courseid)
             if allow_all_staff:
                 if not self.user_manager.has_staff_rights_on_course(course):
-                    raise web.notfound()
+                    raise not_found_exception()
             else:
                 if not self.user_manager.has_admin_rights_on_course(course):
-                    raise web.notfound()
+                    raise not_found_exception()
 
             if taskid is None:
                 return course, None
             else:
                 return course, course.get_task(taskid)
         except:
-            raise web.notfound()
+            raise not_found_exception()
 
 
 class INGIniousSubmissionAdminPage(INGIniousAdminPage):
@@ -58,7 +59,7 @@ class INGIniousSubmissionAdminPage(INGIniousAdminPage):
         """ Prevent MongoDB injections by verifying arrays sent to it """
         for i in usernames:
             if not id_checker(i):
-                raise web.notfound()
+                raise not_found_exception()
 
     def get_selected_submissions(self, course, filter_type, selected_tasks, users, aggregations, stype):
         """
@@ -244,8 +245,8 @@ def make_csv(data):
     for row in output:
         csv_writer.writerow(row)
     csv_string.seek(0)
-    web.header('Content-Type', 'text/csv; charset=utf-8')
-    web.header('Content-disposition', 'attachment; filename=export.csv')
+    add_header('Content-Type', 'text/csv; charset=utf-8')
+    add_header('Content-disposition', 'attachment; filename=export.csv')
     return csv_string.read()
 
 
@@ -266,7 +267,8 @@ def get_menu(course, current, renderer, plugin_manager, user_manager):
                         ("download", "<i class='fa fa-download fa-fw'></i>&nbsp; " + _("Download submissions"))]
 
     if user_manager.has_admin_rights_on_course(course):
-        if web.ctx.app_stack[0].webdav_host:
+        # TODO webpy
+        if webdict().app_stack[0].webdav_host:
             default_entries += [("webdav", "<i class='fa fa-folder-open fa-fw'></i>&nbsp; " + _("WebDAV access"))]
         default_entries += [("replay", "<i class='fa fa-refresh fa-fw'></i>&nbsp; " + _("Replay submissions")),
                             ("danger", "<i class='fa fa-bomb fa-fw'></i>&nbsp; " + _("Danger zone"))]
@@ -284,9 +286,9 @@ class CourseRedirect(INGIniousAdminPage):
         """ GET request """
         course, __ = self.get_course_and_check_rights(courseid)
         if self.user_manager.session_username() in course.get_tutors():
-            raise web.seeother(self.app.get_homepath() + '/admin/{}/tasks'.format(courseid))
+            raise see_other_exception(self.app.get_homepath() + '/admin/{}/tasks'.format(courseid))
         else:
-            raise web.seeother(self.app.get_homepath() + '/admin/{}/settings'.format(courseid))
+            raise see_other_exception(self.app.get_homepath() + '/admin/{}/settings'.format(courseid))
 
     def POST_AUTH(self, courseid):  # pylint: disable=arguments-differ
         """ POST request """

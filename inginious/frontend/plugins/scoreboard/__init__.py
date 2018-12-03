@@ -8,9 +8,8 @@
 """
 from collections import OrderedDict
 
-import web
-
 from inginious.frontend.pages.utils import INGIniousAuthPage
+from inginious.frontend.web_utils import not_found_exception
 
 
 class ScoreBoardCourse(INGIniousAuthPage):
@@ -24,10 +23,10 @@ class ScoreBoardCourse(INGIniousAuthPage):
         try:
             names = {i: val["name"] for i, val in enumerate(scoreboards)}
         except:
-            raise web.notfound("Invalid configuration")
+            raise not_found_exception("Invalid configuration")
 
         if len(names) == 0:
-            raise web.notfound()
+            raise not_found_exception()
 
         return self.template_helper.get_custom_renderer('frontend/plugins/scoreboard').main(course, names)
 
@@ -55,7 +54,7 @@ class ScoreBoard(INGIniousAuthPage):
             scoreboard_content = scoreboards[scoreboardid]["content"]
             scoreboard_reverse = bool(scoreboards[scoreboardid].get('reverse', False))
         except:
-            raise web.notfound()
+            raise not_found_exception()
 
         # Convert scoreboard_content
         if isinstance(scoreboard_content, str):
@@ -71,7 +70,7 @@ class ScoreBoard(INGIniousAuthPage):
             try:
                 task_names[taskid] = course.get_task(taskid).get_name(self.user_manager.session_language())
             except:
-                raise web.notfound("Unknown task id "+taskid)
+                raise not_found_exception("Unknown task id "+taskid)
 
         # Get all submissions
         results = self.database.submissions.find({

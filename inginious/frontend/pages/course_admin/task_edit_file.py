@@ -11,6 +11,7 @@ import web
 
 from inginious.common.base import id_checker
 from inginious.frontend.pages.course_admin.utils import INGIniousAdminPage
+from inginious.frontend.web_utils import webinput, redirect_exception, not_found_exception, add_header
 
 
 class CourseTaskFiles(INGIniousAdminPage):
@@ -23,7 +24,7 @@ class CourseTaskFiles(INGIniousAdminPage):
 
         self.get_course_and_check_rights(courseid, allow_all_staff=False)
 
-        request = web.input()
+        request = webinput()
         if request.get("action") == "download" and request.get('path') is not None:
             return self.action_download(courseid, taskid, request.get('path'))
         elif request.get("action") == "delete" and request.get('path') is not None:
@@ -44,6 +45,7 @@ class CourseTaskFiles(INGIniousAdminPage):
 
         self.get_course_and_check_rights(courseid, allow_all_staff=False)
 
+        # TODO WEBPY
         request = web.input(file={})
         if request.get("action") == "upload" and request.get('path') is not None and request.get('file') is not None:
             return self.action_upload(courseid, taskid, request.get('path'), request.get('file'))
@@ -237,15 +239,15 @@ class CourseTaskFiles(INGIniousAdminPage):
 
         wanted_path = self.verify_path(courseid, taskid, path)
         if wanted_path is None:
-            raise web.notfound()
+            raise not_found_exception()
 
         task_fs = self.task_factory.get_task_fs(courseid, taskid)
         (method, mimetype_or_none, file_or_url) = task_fs.distribute(wanted_path)
 
         if method == "local":
-            web.header('Content-Type', mimetype_or_none)
+            add_header('Content-Type', mimetype_or_none)
             return file_or_url
         elif method == "url":
-            raise web.redirect(file_or_url)
+            raise redirect_exception(file_or_url)
         else:
-            raise web.notfound()
+            raise not_found_exception()
