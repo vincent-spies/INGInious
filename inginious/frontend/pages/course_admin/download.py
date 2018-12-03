@@ -5,7 +5,6 @@
 
 import logging
 
-import web
 from bson.objectid import ObjectId
 
 from inginious.frontend.pages.course_admin.utils import INGIniousSubmissionAdminPage
@@ -30,8 +29,7 @@ class CourseDownloadSubmissions(INGIniousSubmissionAdminPage):
         """ GET request """
         course, __ = self.get_course_and_check_rights(courseid)
 
-        # TODO WEBPY
-        user_input = web.input(tasks=[], aggregations=[], users=[])
+        user_input = webinput(tasks=[], aggregations=[], users=[])
 
         if "filter_type" not in user_input or "type" not in user_input or "format" not in user_input or user_input.format not in self.valid_formats():
             raise not_found_exception()

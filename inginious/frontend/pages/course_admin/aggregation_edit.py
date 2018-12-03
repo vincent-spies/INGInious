@@ -7,13 +7,12 @@
 
 import json
 
-import web
 from bson.objectid import ObjectId
 from pymongo import ReturnDocument
 
 from inginious.common import custom_yaml
 from inginious.frontend.pages.course_admin.utils import INGIniousAdminPage
-from inginious.frontend.web_utils import not_found_exception, see_other_exception
+from inginious.frontend.web_utils import not_found_exception, see_other_exception, webinput
 
 
 class CourseEditAggregation(INGIniousAdminPage):
@@ -174,8 +173,7 @@ class CourseEditAggregation(INGIniousAdminPage):
         msg=''
         error = False
         errored_students = []
-        # TODO WEBPY
-        data = web.input(delete=[], tutors=[], groups=[], aggregationfile={})
+        data = webinput(delete=[], tutors=[], groups=[], aggregationfile={})
         if len(data["delete"]):
 
             for classid in data["delete"]:

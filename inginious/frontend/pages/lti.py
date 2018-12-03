@@ -144,7 +144,7 @@ class LTILaunchPage(INGIniousPage):
 
     def _parse_lti_data(self, courseid, taskid):
         """ Verify and parse the data for the LTI basic launch """
-        post_input = webinput("POST", True)
+        post_input = webinput(_method="POST", _raw=True)
         self.logger.debug('_parse_lti_data:' + str(post_input))
 
         try:

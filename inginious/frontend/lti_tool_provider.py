@@ -11,7 +11,7 @@ class LTIWebPyToolProvider(ToolProvider):
 
     @classmethod
     def from_webpy_request(cls, secret=None):
-        params = webinput("POST", True)
+        params = webinput(_method="POST", _raw=True)
         headers = webdict().env.copy()
 
         headers = dict([(k, headers[k])

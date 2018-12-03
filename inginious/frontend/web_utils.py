@@ -33,13 +33,19 @@ def not_acceptable_exception():
 def forbidden_exception(msg=None):
     return web.forbidden(msg)
 
-def webinput(what="both", raw=False):
+def webinput(*requireds, _method="both", _raw=False, **defaults):
     """ If what is "both", returns all input from GET and POST.
     If what is POST or GET, returns only the data from post or get."""
-    if what is "both":
-        return webinput() if not raw else web.webapi.rawinput()
+    if _method is "both":
+        data = web.webapi.rawinput()
     else:
-        return web.input(what) if not raw else web.webapi.rawinput(what)
+        data = web.webapi.rawinput(_method)
+
+    if _raw:
+        return data
+    else:
+        defaults.setdefault('_unicode', True)  # force unicode conversion by default.
+        return web.storify(data, *requireds, **defaults)
 
 def add_header(header, value, unique=False):
     web.header(header, value)

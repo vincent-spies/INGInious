@@ -5,8 +5,6 @@
 
 from collections import OrderedDict
 
-import web
-
 from inginious.frontend.pages.course_admin.utils import make_csv, INGIniousAdminPage
 from inginious.frontend.web_utils import webinput
 
@@ -22,8 +20,7 @@ class CourseTaskListPage(INGIniousAdminPage):
     def POST_AUTH(self, courseid):  # pylint: disable=arguments-differ
         """ POST request """
         course, __ = self.get_course_and_check_rights(courseid)
-        # TODO webpy
-        data = web.input(task=[])
+        data = webinput(task=[])
 
         if "task" in data:
             # Change tasks order

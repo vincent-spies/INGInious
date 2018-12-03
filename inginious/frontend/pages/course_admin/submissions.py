@@ -4,8 +4,6 @@
 # more information about the licensing of this file.
 
 import pymongo
-# TODO webpy
-import web
 import re
 import itertools
 import gettext
@@ -86,7 +84,7 @@ class CourseSubmissionsPage(INGIniousAdminPage):
                                   username in aggregation['groups'][0]["students"]) else None
                                   ) for aggregation in classroom for username in aggregation["students"]])
 
-            download_type = web.input(download_type=self._valid_formats[0]).download_type
+            download_type = webinput(download_type=self._valid_formats[0]).download_type
             if download_type not in self._valid_formats:
                 download_type = self._valid_formats[0]
             return self.submission_manager.get_submission_archive(data, list(reversed(download_type.split('/'))), aggregations)
@@ -181,7 +179,7 @@ class CourseSubmissionsPage(INGIniousAdminPage):
 
     def get_input(self):
         """ Loads web input, initialise default values and check/sanitise some inputs from users """
-        user_input = web.input(
+        user_input = webinput(
             user=[],
             task=[],
             aggregation=[],

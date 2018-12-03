@@ -7,8 +7,6 @@
 import json
 import os.path
 
-import web
-
 from inginious.common.base import id_checker
 from inginious.frontend.pages.course_admin.utils import INGIniousAdminPage
 from inginious.frontend.web_utils import webinput, redirect_exception, not_found_exception, add_header
@@ -45,8 +43,7 @@ class CourseTaskFiles(INGIniousAdminPage):
 
         self.get_course_and_check_rights(courseid, allow_all_staff=False)
 
-        # TODO WEBPY
-        request = web.input(file={})
+        request = webinput(file={})
         if request.get("action") == "upload" and request.get('path') is not None and request.get('file') is not None:
             return self.action_upload(courseid, taskid, request.get('path'), request.get('file'))
         elif request.get("action") == "edit_save" and request.get('path') is not None and request.get('content') is not None:

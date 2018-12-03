@@ -14,7 +14,6 @@ from zipfile import ZipFile
 from natsort import natsorted
 
 import bson
-import web
 from inginious.frontend.accessible_time import AccessibleTime
 from inginious.frontend.pages.course_admin.utils import INGIniousAdminPage
 
@@ -22,7 +21,7 @@ import inginious.common.custom_yaml
 from inginious.common.base import id_checker
 from inginious.frontend.pages.course_admin.task_edit_file import CourseTaskFiles
 from inginious.frontend.tasks import WebAppTask
-from inginious.frontend.web_utils import see_other_exception
+from inginious.frontend.web_utils import see_other_exception, webinput
 
 
 class CourseEditTask(INGIniousAdminPage):
@@ -136,8 +135,7 @@ class CourseEditTask(INGIniousAdminPage):
             raise Exception("Invalid course/task id")
 
         course, __ = self.get_course_and_check_rights(courseid, allow_all_staff=False)
-        # TODO webpy
-        data = web.input(task_file={})
+        data = webinput(task_file={})
 
         # Delete task ?
         if "delete" in data:

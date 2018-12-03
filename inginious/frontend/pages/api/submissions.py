@@ -8,8 +8,6 @@
 import base64
 import gettext
 
-import web
-
 from inginious.frontend.pages.api._api_page import APIAuthenticatedPage, APINotFound, APIForbidden, APIInvalidArguments, APIError
 from inginious.frontend.web_utils import webinput
 
@@ -186,8 +184,7 @@ class APISubmissions(APIAuthenticatedPage):
             problem.get_id(): problem.input_type()()
             for problem in task.get_problems() if problem.input_type() in [dict, list]
         }
-        # TODO WEBPY
-        user_input = task.adapt_input_for_backend(web.input(**init_var))
+        user_input = task.adapt_input_for_backend(webinput(**init_var))
 
         if not task.input_is_consistent(user_input, self.default_allowed_file_extensions, self.default_max_file_size):
             raise APIInvalidArguments()

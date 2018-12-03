@@ -214,8 +214,7 @@ class BaseTaskPage(object):
                     problem.get_id(): problem.input_type()()
                     for problem in task.get_problems() if problem.input_type() in [dict, list]
                 }
-                # TODO still dependent on web.py's specific input parsing method
-                userinput = task.adapt_input_for_backend(web.input(**init_var))
+                userinput = task.adapt_input_for_backend(webinput(**init_var))
 
                 if not task.input_is_consistent(userinput, self.default_allowed_file_extensions, self.default_max_file_size):
                     add_header('Content-Type', 'application/json')
@@ -292,6 +291,7 @@ class BaseTaskPage(object):
             else:
                 raise not_found_exception()
         except:
+            # TODO WEBPY
             if web.config.debug:
                 raise
             else:
@@ -417,9 +417,11 @@ class TaskPageStaticDownload(INGIniousPage):
                 raise redirect_exception(file_or_url)
             else:
                 raise not_found_exception()
+        # TODO WEBPY
         except web.HTTPError as error_or_redirect:
             raise error_or_redirect
         except:
+            # TODO WEBPY
             if web.config.debug:
                 raise
             else:

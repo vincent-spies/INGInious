@@ -7,14 +7,12 @@
 
 import json
 
-import web
-
 from bson.objectid import ObjectId
 from pymongo import ReturnDocument
 
 from inginious.common import custom_yaml
 from inginious.frontend.pages.course_admin.utils import INGIniousAdminPage
-from inginious.frontend.web_utils import not_found_exception, see_other_exception
+from inginious.frontend.web_utils import not_found_exception, see_other_exception, webinput
 
 
 class CourseEditClassroom(INGIniousAdminPage):
@@ -140,8 +138,7 @@ class CourseEditClassroom(INGIniousAdminPage):
             raise not_found_exception()
 
         error = False
-        # TODO WEBPY
-        data = web.input(tutors=[], groups=[], classroomfile={})
+        data = webinput(tutors=[], groups=[], classroomfile={})
         if "delete" in data:
             # Get the classroom
             classroom = self.database.classrooms.find_one({"_id": ObjectId(classroomid), "courseid": courseid})
