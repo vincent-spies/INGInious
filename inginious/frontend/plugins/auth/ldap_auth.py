@@ -89,7 +89,7 @@ class LDAPAuthenticationPage(AuthenticationPage):
 
         try:
             request = settings["request"].format(login)
-            conn.search(settings["base_dn"], request, attributes=["cn", "mail"])
+            conn.search(settings["base_dn"], request, attributes=["description", "mail"])
             user_data = conn.response[0]
         except Exception as ex:
             logger.exception("Can't get user data : " + str(ex))
@@ -99,9 +99,13 @@ class LDAPAuthenticationPage(AuthenticationPage):
 
         if conn.rebind(user_data['dn'], password=password):
             try:
-                email = user_data["attributes"][settings.get("mail", "mail")][0]
+                email = user_data["attributes"]["mail"]
+                if isinstance(email, list):
+                    email = email[0]
                 username = login
-                realname = user_data["attributes"][settings.get("cn", "cn")][0]
+                realname = user_data["attributes"]["description"]
+                if isinstance(realname, list):
+                    realname = realname[0]
             except KeyError as e:
                 logger.exception("Can't get field " + str(e) + " from your LDAP server")
                 return self.template_helper.get_custom_renderer('frontend/plugins/auth').custom_auth_form(
