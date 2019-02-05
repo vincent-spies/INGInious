@@ -80,7 +80,7 @@ class LDAPAuthenticationPage(AuthenticationPage):
             logger.debug('Connecting to ' + settings['host'] + ", port " + str(settings['port']))
             conn = ldap3.Connection(
                 ldap3.Server(settings['host'], port=settings['port'], use_ssl=settings["encryption"] == 'ssl',
-                             get_info=ldap3.ALL), auto_bind=True)
+                             get_info=ldap3.ALL), auto_bind=True, user=settings['bind_user'], password=settings['bind_password'])
             logger.debug('Connected to ' + settings['host'] + ", port " + str(settings['port']))
         except Exception as e:
             logger.exception("Can't initialze connection to " + settings['host'] + ': ' + str(e))
